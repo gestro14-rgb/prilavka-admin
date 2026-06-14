@@ -22,6 +22,9 @@ export default function Layout() {
           <NavLink to="/categories" className={({ isActive }) => (isActive ? 'active' : '')}>
             🏷️ Категории
           </NavLink>
+          <NavLink to="/delivery-zone" className={({ isActive }) => (isActive ? 'active' : '')}>
+            📍 Зона доставки
+          </NavLink>
         </nav>
         <button className="logout-btn" onClick={handleLogout}>
           ⎋ Выйти
