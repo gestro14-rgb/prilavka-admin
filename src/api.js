@@ -84,4 +84,20 @@ export const api = {
     request(`/api/admin/categories/${id}`, {
       method: 'DELETE',
     }),
+
+  getDeliveryZones: () => request('/api/admin/delivery-zones'),
+  createDeliveryZone: (data) =>
+    request('/api/admin/delivery-zones', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateDeliveryZone: (id, data) =>
+    request(`/api/admin/delivery-zones/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteDeliveryZone: (id) =>
+    request(`/api/admin/delivery-zones/${id}`, {
+      method: 'DELETE',
+    }),
 };
