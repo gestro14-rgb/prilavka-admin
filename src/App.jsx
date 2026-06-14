@@ -5,6 +5,7 @@ import Layout from './Layout';
 import ProductsList from './ProductsList';
 import ProductForm from './ProductForm';
 import Categories from './Categories';
+import DeliveryZone from './DeliveryZone';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="products" element={<ProductsList />} />
         <Route path="products/:id" element={<ProductForm />} />
         <Route path="categories" element={<Categories />} />
+        <Route path="delivery-zone" element={<DeliveryZone />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
