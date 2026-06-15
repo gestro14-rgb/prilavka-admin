@@ -60,7 +60,10 @@ export default function PromoCodes() {
       setError(e.message);
     } finally {
       setSaving(false);
-    }  const handleDelete = async (id) => {
+    }
+  };
+
+  const handleDelete = async (id) => {
     if (!window.confirm('Удалить этот промокод?')) return;
     setError('');
     try {
@@ -179,6 +182,3 @@ export default function PromoCodes() {
     </div>
   );
 }
-
-  };
-
