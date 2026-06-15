@@ -28,6 +28,9 @@ export default function Layout() {
           <NavLink to="/delivery-zone" className={({ isActive }) => (isActive ? 'active' : '')}>
             📍 Зона доставки
           </NavLink>
+          <NavLink to="/promo-codes" className={({ isActive }) => (isActive ? 'active' : '')}>
+            🎁 Промокоды
+          </NavLink>
         </nav>
         <button className="logout-btn" onClick={handleLogout}>
           ⎋ Выйти
