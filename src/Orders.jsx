@@ -97,9 +97,16 @@ export default function Orders() {
                 ))}
               </div>
 
-              <div className="section-label">Доставка</div>
+                            <div className="section-label" style={{ marginTop: 0 }}>Состав</div>
               <div style={{ fontSize: 13.5, lineHeight: 1.6, marginBottom: 12 }}>
-                <div>
+                {o.items.map((item, i) => (
+                  <div key={i}>{item.title} × {item.qty} — {Number(item.sum).toLocaleString('ru-RU')} ₽</div>
+                ))}
+                {o.promoCode && o.discountAmount > 0 && (
+                  <div>🎁 Промокод {o.promoCode} (−{Number(o.discountAmount).toLocaleString('ru-RU')} ₽)</div>
+                )}
+              </div>
+
                   {o.deliveryDate ? `${o.deliveryDate.day || ''} ${o.deliveryDate.date || ''}`.trim() : '—'}
                   {o.deliverySlot ? `, ${o.deliverySlot}` : ''}
                 </div>
