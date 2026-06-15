@@ -7,6 +7,7 @@ import ProductForm from './ProductForm';
 import Categories from './Categories';
 import DeliveryZone from './DeliveryZone';
 import Orders from './Orders';
+import PromoCodes from './PromoCodes';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="products/:id" element={<ProductForm />} />
         <Route path="categories" element={<Categories />} />
         <Route path="delivery-zone" element={<DeliveryZone />} />
+        <Route path="promo-codes" element={<PromoCodes />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
