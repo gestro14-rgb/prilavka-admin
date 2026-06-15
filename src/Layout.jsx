@@ -16,6 +16,9 @@ export default function Layout() {
         <h1>Прилавка</h1>
         <div className="sub">{user?.username}</div>
         <nav>
+          <NavLink to="/orders" className={({ isActive }) => (isActive ? 'active' : '')}>
+            🧾 Заказы
+          </NavLink>
           <NavLink to="/products" className={({ isActive }) => (isActive ? 'active' : '')}>
             🧺 Товары
           </NavLink>
