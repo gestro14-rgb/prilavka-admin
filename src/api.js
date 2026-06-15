@@ -100,4 +100,22 @@ export const api = {
     request(`/api/admin/delivery-zones/${id}`, {
       method: 'DELETE',
     }),
+
+  getOrders: () => request('/api/admin/orders'),
+  updateOrder: (id, data) =>
+    request(`/api/admin/orders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  getPromoCodes: () => request('/api/admin/promo-codes'),
+  createPromoCode: (data) =>
+    request('/api/admin/promo-codes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deletePromoCode: (id) =>
+    request(`/api/admin/promo-codes/${id}`, {
+      method: 'DELETE',
+    }),
 };
