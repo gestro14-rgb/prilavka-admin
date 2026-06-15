@@ -1,47 +1,110 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
-import { useAuth } from './AuthContext';
-import Login from './Login';
-import Layout from './Layout';
-import ProductsList from './ProductsList';
-import ProductForm from './ProductForm';
-import Categories from './Categories';
-import DeliveryZone from './DeliveryZone';
+// API-клиент для админ-панели "Прилавка"
 
-function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth();
+// URL бэкенда задаётся через переменную окружения VITE_API_URL при сборке.
+// Для локальной разработки по умолчанию используется localhost:3001.
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-  if (loading) {
-    return <div className="loading">Загрузка…</div>;
-  }
+const TOKEN_KEY = 'prilavka_admin_token';
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return children;
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
 }
 
-export default function App() {
-  return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Navigate to="/products" replace />} />
-        <Route path="products" element={<ProductsList />} />
-        <Route path="products/:id" element={<ProductForm />} />
-        <Route path="categories" element={<Categories />} />
-        <Route path="delivery-zone" element={<DeliveryZone />} />
-      </Route>
-
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
+export function setToken(token) {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+  }
 }
+
+async function request(path, options = {}) {
+  const token = getToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (res.status === 401) {
+    setToken(null);
+  }
+
+  const contentType = res.headers.get('content-type') || '';
+  const body = contentType.includes('application/json') ? await res.json() : null;
+
+  if (!res.ok) {
+    const message = body?.error || `Ошибка запроса: ${res.status}`;
+    throw new Error(message);
+  }
+
+  return body;
+}
+
+export const api = {
+  login: (username, password) =>
+    request('/api/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    }),
+
+  me: () => request('/api/admin/me'),
+
+  getProducts: () => request('/api/admin/products'),
+  getProduct: (id) => request(`/api/admin/products/${id}`),
+  createProduct: (data) =>
+    request('/api/admin/products', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateProduct: (id, data) =>
+    request(`/api/admin/products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteProduct: (id) =>
+    request(`/api/admin/products/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getCategories: () => request('/api/admin/categories'),
+  createCategory: (data) =>
+    request('/api/admin/categories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteCategory: (id) =>
+    request(`/api/admin/categories/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getDeliveryZones: () => request('/api/admin/delivery-zones'),
+  createDeliveryZone: (data) =>
+    request('/api/admin/delivery-zones', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateDeliveryZone: (id, data) =>
+    request(`/api/admin/delivery-zones/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteDeliveryZone: (id) =>
+    request(`/api/admin/delivery-zones/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getOrders: () => request('/api/admin/orders'),
+  updateOrder: (id, data) =>
+    request(`/api/admin/orders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+};
