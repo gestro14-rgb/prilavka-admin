@@ -9,6 +9,7 @@ import DeliveryZone from './DeliveryZone';
 import Orders from './Orders';
 import PromoCodes from './PromoCodes';
 import Users from './Users';
+import Rewards from './Rewards';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="delivery-zone" element={<DeliveryZone />} />
         <Route path="promo-codes" element={<PromoCodes />} />
         <Route path="users" element={<Users />} />
+        <Route path="rewards" element={<Rewards />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

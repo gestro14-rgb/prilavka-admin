@@ -34,6 +34,9 @@ export default function Layout() {
           <NavLink to="/users" className={({ isActive }) => (isActive ? 'active' : '')}>
             👥 Пользователи
           </NavLink>
+          <NavLink to="/rewards" className={({ isActive }) => (isActive ? 'active' : '')}>
+            🏆 Награды
+          </NavLink>
         </nav>
         <button className="logout-btn" onClick={handleLogout}>
           ⎋ Выйти

@@ -125,4 +125,20 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ delta }),
     }),
+
+  getRewards: () => request('/api/admin/rewards'),
+  createReward: (data) =>
+    request('/api/admin/rewards', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateReward: (id, data) =>
+    request(`/api/admin/rewards/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteReward: (id) =>
+    request(`/api/admin/rewards/${id}`, {
+      method: 'DELETE',
+    }),
 };
