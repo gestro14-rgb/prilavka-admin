@@ -118,4 +118,11 @@ export const api = {
     request(`/api/admin/promo-codes/${id}`, {
       method: 'DELETE',
     }),
+
+  getUsers: () => request('/api/admin/users'),
+  adjustUserPoints: (telegramId, delta) =>
+    request(`/api/admin/users/${telegramId}/points`, {
+      method: 'PATCH',
+      body: JSON.stringify({ delta }),
+    }),
 };

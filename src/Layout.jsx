@@ -31,6 +31,9 @@ export default function Layout() {
           <NavLink to="/promo-codes" className={({ isActive }) => (isActive ? 'active' : '')}>
             🎁 Промокоды
           </NavLink>
+          <NavLink to="/users" className={({ isActive }) => (isActive ? 'active' : '')}>
+            👥 Пользователи
+          </NavLink>
         </nav>
         <button className="logout-btn" onClick={handleLogout}>
           ⎋ Выйти

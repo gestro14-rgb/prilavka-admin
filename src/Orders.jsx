@@ -98,6 +98,9 @@ export default function Orders() {
                 {o.promoCode && o.discountAmount > 0 && (
                   <div>🎁 Промокод {o.promoCode} (−{Number(o.discountAmount).toLocaleString('ru-RU')} ₽)</div>
                 )}
+                {o.referralCode && o.discountAmount > 0 && (
+                  <div>👥 Реферальный код {o.referralCode} (−{Number(o.discountAmount).toLocaleString('ru-RU')} ₽)</div>
+                )}
               </div>
 
               <div className="section-label">Доставка</div>
