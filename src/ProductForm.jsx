@@ -16,6 +16,7 @@ const EMPTY_PRODUCT = {
   pricing: [],
   isActive: true,
   sortOrder: 0,
+  imageUrl: '',
 };
 
 const BADGE_TYPES = [
@@ -261,6 +262,18 @@ export default function ProductForm() {
                 onChange={(e) => updateField('emoji', e.target.value)}
                 placeholder="🥕"
               />
+            </div>
+
+            <div className="field full">
+              <label htmlFor="imageUrl">URL фотографии (опционально)</label>
+              <input
+                id="imageUrl"
+                type="url"
+                value={form.imageUrl || ''}
+                onChange={(e) => updateField('imageUrl', e.target.value)}
+                placeholder="https://example.com/photo.jpg"
+              />
+              <div className="hint">Если указано — фото показывается вместо эмодзи в каталоге и карточке товара.</div>
             </div>
 
             <div className="field">
