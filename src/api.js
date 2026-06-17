@@ -153,6 +153,8 @@ export const api = {
       method: 'DELETE',
     }),
 
+  getStats: () => request('/api/admin/stats'),
+
   getRewards: () => request('/api/admin/rewards'),
   createReward: (data) =>
     request('/api/admin/rewards', {
