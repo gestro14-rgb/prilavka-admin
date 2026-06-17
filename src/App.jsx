@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import Login from './Login';
 import Layout from './Layout';
+import Stats from './Stats';
 import ProductsList from './ProductsList';
 import ProductForm from './ProductForm';
 import Categories from './Categories';
@@ -40,7 +41,8 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/orders" replace />} />
+        <Route index element={<Navigate to="/stats" replace />} />
+        <Route path="stats" element={<Stats />} />
         <Route path="orders" element={<Orders />} />
         <Route path="products" element={<ProductsList />} />
         <Route path="products/:id" element={<ProductForm />} />
