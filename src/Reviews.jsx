@@ -15,6 +15,7 @@ export default function Reviews() {
   const [text, setText] = useState('');
   const [emoji, setEmoji] = useState('😊');
   const [sortOrder, setSortOrder] = useState(0);
+  const [imageUrl, setImageUrl] = useState('');
 
   const load = () => {
     api
@@ -37,7 +38,7 @@ export default function Reviews() {
     }
     setSaving(true);
     try {
-      await api.createReview({ name: name.trim(), area: area.trim(), stars, text: text.trim(), emoji: emoji.trim(), sortOrder: Number(sortOrder) || 0 });
+      await api.createReview({ name: name.trim(), area: area.trim(), stars, text: text.trim(), emoji: emoji.trim(), sortOrder: Number(sortOrder) || 0, imageUrl: imageUrl.trim() || null });
       setSuccess('Отзыв добавлен');
       setName('');
       setArea('');
@@ -45,6 +46,7 @@ export default function Reviews() {
       setText('');
       setEmoji('😊');
       setSortOrder(0);
+      setImageUrl('');
       load();
     } catch (e) {
       setError(e.message);
@@ -123,6 +125,16 @@ export default function Reviews() {
                 onChange={(e) => setText(e.target.value)}
                 placeholder="Текст отзыва…"
                 style={{ width: '100%', fontFamily: 'inherit', fontSize: 14, padding: '6px 8px', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div className="field full">
+              <label htmlFor="rImageUrl">URL фото клиента (опционально)</label>
+              <input
+                id="rImageUrl"
+                type="url"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://example.com/photo.jpg"
               />
             </div>
             <div className="field">
