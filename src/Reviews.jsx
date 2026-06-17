@@ -55,6 +55,16 @@ export default function Reviews() {
     }
   };
 
+  const handlePublish = async (id) => {
+    setError('');
+    try {
+      await api.publishReview(id);
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!window.confirm('Удалить этот отзыв?')) return;
     setError('');
@@ -163,25 +173,32 @@ export default function Reviews() {
         <table className="product-table">
           <thead>
             <tr>
+              <th>Статус</th>
               <th>Эмодзи</th>
               <th>Имя</th>
               <th>Район</th>
               <th>Оценка</th>
               <th>Текст</th>
-              <th>Порядок</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {reviews.map((r) => (
-              <tr key={r.id}>
+              <tr key={r.id} style={{ opacity: r.status === 'pending' ? 0.75 : 1 }}>
+                <td>
+                  {r.status === 'pending'
+                    ? <span style={{ fontSize: 12, background: '#FFF3CD', color: '#856404', borderRadius: 6, padding: '2px 8px', fontWeight: 600 }}>На модерации</span>
+                    : <span style={{ fontSize: 12, background: '#D4EDDA', color: '#155724', borderRadius: 6, padding: '2px 8px', fontWeight: 600 }}>Опубликован</span>}
+                </td>
                 <td style={{ fontSize: 22 }}>{r.emoji}</td>
                 <td><b>{r.name}</b></td>
                 <td>{r.area}</td>
                 <td>{'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}</td>
-                <td style={{ maxWidth: 320 }}>{r.text}</td>
-                <td>{r.sortOrder}</td>
-                <td>
+                <td style={{ maxWidth: 280 }}>{r.text}</td>
+                <td style={{ display: 'flex', gap: 6 }}>
+                  {r.status === 'pending' && (
+                    <button className="btn-primary" style={{ fontSize: 13, padding: '4px 10px' }} onClick={() => handlePublish(r.id)}>Опубликовать</button>
+                  )}
                   <button className="btn-danger" onClick={() => handleDelete(r.id)}>Удалить</button>
                 </td>
               </tr>

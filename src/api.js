@@ -136,6 +136,11 @@ export const api = {
     request(`/api/admin/reviews/${id}`, {
       method: 'DELETE',
     }),
+  publishReview: (id) =>
+    request(`/api/admin/reviews/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'published' }),
+    }),
 
   getDeliveries: () => request('/api/admin/deliveries'),
   createDelivery: (data) =>
