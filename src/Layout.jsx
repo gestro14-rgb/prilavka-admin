@@ -37,6 +37,12 @@ export default function Layout() {
           <NavLink to="/rewards" className={({ isActive }) => (isActive ? 'active' : '')}>
             🏆 Награды
           </NavLink>
+          <NavLink to="/reviews" className={({ isActive }) => (isActive ? 'active' : '')}>
+            ⭐ Отзывы
+          </NavLink>
+          <NavLink to="/deliveries" className={({ isActive }) => (isActive ? 'active' : '')}>
+            🚚 Доставки
+          </NavLink>
         </nav>
         <button className="logout-btn" onClick={handleLogout}>
           ⎋ Выйти

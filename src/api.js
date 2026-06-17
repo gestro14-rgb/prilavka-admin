@@ -126,6 +126,28 @@ export const api = {
       body: JSON.stringify({ delta }),
     }),
 
+  getReviews: () => request('/api/admin/reviews'),
+  createReview: (data) =>
+    request('/api/admin/reviews', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteReview: (id) =>
+    request(`/api/admin/reviews/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getDeliveries: () => request('/api/admin/deliveries'),
+  createDelivery: (data) =>
+    request('/api/admin/deliveries', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteDelivery: (id) =>
+    request(`/api/admin/deliveries/${id}`, {
+      method: 'DELETE',
+    }),
+
   getRewards: () => request('/api/admin/rewards'),
   createReward: (data) =>
     request('/api/admin/rewards', {
