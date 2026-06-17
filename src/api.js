@@ -155,6 +155,15 @@ export const api = {
 
   getStats: () => request('/api/admin/stats'),
 
+  getDeliverySchedule: () => request('/api/admin/delivery-schedule'),
+  upsertDeliverySchedule: (data) =>
+    request('/api/admin/delivery-schedule', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteDeliverySchedule: (id) =>
+    request(`/api/admin/delivery-schedule/${id}`, { method: 'DELETE' }),
+
   getRewards: () => request('/api/admin/rewards'),
   createReward: (data) =>
     request('/api/admin/rewards', {

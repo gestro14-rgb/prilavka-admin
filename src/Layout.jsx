@@ -19,6 +19,9 @@ export default function Layout() {
           <NavLink to="/stats" className={({ isActive }) => (isActive ? 'active' : '')}>
             📊 Статистика
           </NavLink>
+          <NavLink to="/schedule" className={({ isActive }) => (isActive ? 'active' : '')}>
+            📅 Расписание
+          </NavLink>
           <NavLink to="/orders" className={({ isActive }) => (isActive ? 'active' : '')}>
             🧾 Заказы
           </NavLink>
