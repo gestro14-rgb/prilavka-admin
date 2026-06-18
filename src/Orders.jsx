@@ -120,6 +120,7 @@ export default function Orders() {
                 <div>
                   {[o.telegramFirstName, o.telegramUsername ? `@${o.telegramUsername}` : null].filter(Boolean).join(' ') || '—'}
                 </div>
+                {o.phone && <div>📞 {o.phone}</div>}
                 <div>{PAYMENT_LABELS[o.paymentMethod] || o.paymentMethod}</div>
               </div>
 
