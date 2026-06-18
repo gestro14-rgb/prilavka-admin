@@ -4,6 +4,7 @@ import { api } from './api';
 const STATUS_LABELS = {
   new: 'Новый',
   in_progress: 'В работе',
+  courier: 'Курьер едет',
   delivered: 'Доставлен',
   cancelled: 'Отменён',
 };
