@@ -34,6 +34,9 @@ export default function Layout() {
           <NavLink to="/delivery-zone" className={({ isActive }) => (isActive ? 'active' : '')}>
             📍 Зона доставки
           </NavLink>
+          <NavLink to="/districts" className={({ isActive }) => (isActive ? 'active' : '')}>
+            🏘️ Районы
+          </NavLink>
           <NavLink to="/promo-codes" className={({ isActive }) => (isActive ? 'active' : '')}>
             🎁 Промокоды
           </NavLink>

@@ -14,6 +14,7 @@ import Users from './Users';
 import Rewards from './Rewards';
 import Reviews from './Reviews';
 import Deliveries from './Deliveries';
+import Districts from './Districts';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="rewards" element={<Rewards />} />
         <Route path="reviews" element={<Reviews />} />
         <Route path="deliveries" element={<Deliveries />} />
+        <Route path="districts" element={<Districts />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

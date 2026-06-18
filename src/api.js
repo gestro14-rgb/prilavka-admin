@@ -85,6 +85,15 @@ export const api = {
       method: 'DELETE',
     }),
 
+  getDistricts: () => request('/api/admin/districts'),
+  createDistrict: (data) =>
+    request('/api/admin/districts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteDistrict: (id) =>
+    request(`/api/admin/districts/${id}`, { method: 'DELETE' }),
+
   getDeliveryZones: () => request('/api/admin/delivery-zones'),
   createDeliveryZone: (data) =>
     request('/api/admin/delivery-zones', {
