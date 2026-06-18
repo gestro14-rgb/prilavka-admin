@@ -99,7 +99,7 @@ export default function ProductForm() {
   const addSupplier = () => {
     setForm((prev) => ({
       ...prev,
-      suppliers: [...prev.suppliers, { emoji: '🧑‍🌾', name: '', region: '', note: '' }],
+      suppliers: [...prev.suppliers, { emoji: '🧑‍🌾', name: '', region: '', note: '', imageUrl: '' }],
     }));
   };
   const removeSupplier = (index) => {
@@ -390,6 +390,15 @@ export default function ProductForm() {
                     value={s.name || ''}
                     onChange={(e) => updateSupplier(i, 'name', e.target.value)}
                     placeholder="например, Сергей Иванов"
+                  />
+                </div>
+                <div className="field">
+                  <label>URL фото</label>
+                  <input
+                    type="url"
+                    value={s.imageUrl || ''}
+                    onChange={(e) => updateSupplier(i, 'imageUrl', e.target.value)}
+                    placeholder="https://example.com/photo.jpg"
                   />
                 </div>
                 <div className="field">
