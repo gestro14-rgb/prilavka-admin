@@ -17,6 +17,7 @@ const EMPTY_PRODUCT = {
   isActive: true,
   sortOrder: 0,
   imageUrl: '',
+  isBundle: false,
 };
 
 const BADGE_TYPES = [
@@ -33,43 +34,50 @@ const CATEGORIES = [
   { value: 'greens', label: 'Зелень' },
 ];
 
+const EMPTY_BUNDLE_ITEM = { id: 'new', itemName: '', itemEmoji: '', alternatives: [], isRemovable: true };
+
 export default function ProductForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isNew = id === 'new';
 
+  // Основная форма товара
   const [form, setForm] = useState(EMPTY_PRODUCT);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Кастомизируемый состав набора
+  const [bundleComposition, setBundleComposition] = useState([]);
+  const [editingItem, setEditingItem] = useState(null); // null | {...EMPTY_BUNDLE_ITEM}
+  const [bundleItemSaving, setBundleItemSaving] = useState(false);
+  const [bundleError, setBundleError] = useState('');
+  const [newAltName, setNewAltName] = useState('');
+  const [newAltEmoji, setNewAltEmoji] = useState('');
+
   useEffect(() => {
     if (isNew) return;
     api
       .getProduct(id)
-      .then((p) =>
-        setForm({
-          ...p,
-          badge: p.badge || null,
-        })
-      )
+      .then((p) => {
+        setForm({ ...EMPTY_PRODUCT, ...p, badge: p.badge || null, isBundle: p.isBundle || false });
+        setBundleComposition(p.bundleComposition || []);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [id, isNew]);
 
-  const updateField = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  };
+  // ===== Основные поля =====
+  const updateField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
-  const updateBadgeField = (field, value) => {
+  const updateBadgeField = (field, value) =>
     setForm((prev) => {
       const badge = prev.badge || { type: '', label: '' };
       return { ...prev, badge: { ...badge, [field]: value } };
     });
-  };
 
-  // ===== Composition (состав набора) =====
-  const updateCompositionItem = (index, field, value) => {
+  // ===== Состав (ингредиенты для ценовой разбивки) =====
+  const updateCompositionItem = (index, field, value) =>
     setForm((prev) => {
       const composition = [...prev.composition];
       const row = [...(composition[index] || ['', ''])];
@@ -77,72 +85,131 @@ export default function ProductForm() {
       composition[index] = row;
       return { ...prev, composition };
     });
-  };
-  const addCompositionItem = () => {
+  const addCompositionItem = () =>
     setForm((prev) => ({ ...prev, composition: [...prev.composition, ['', '']] }));
-  };
-  const removeCompositionItem = (index) => {
-    setForm((prev) => ({
-      ...prev,
-      composition: prev.composition.filter((_, i) => i !== index),
-    }));
-  };
+  const removeCompositionItem = (index) =>
+    setForm((prev) => ({ ...prev, composition: prev.composition.filter((_, i) => i !== index) }));
 
-  // ===== Suppliers (поставщики) =====
-  const updateSupplier = (index, field, value) => {
+  // ===== Поставщики =====
+  const updateSupplier = (index, field, value) =>
     setForm((prev) => {
       const suppliers = [...prev.suppliers];
       suppliers[index] = { ...suppliers[index], [field]: value };
       return { ...prev, suppliers };
     });
-  };
-  const addSupplier = () => {
+  const addSupplier = () =>
     setForm((prev) => ({
       ...prev,
       suppliers: [...prev.suppliers, { emoji: '🧑‍🌾', name: '', region: '', note: '', imageUrl: '' }],
     }));
-  };
-  const removeSupplier = (index) => {
-    setForm((prev) => ({
-      ...prev,
-      suppliers: prev.suppliers.filter((_, i) => i !== index),
-    }));
-  };
+  const removeSupplier = (index) =>
+    setForm((prev) => ({ ...prev, suppliers: prev.suppliers.filter((_, i) => i !== index) }));
 
-  // ===== Pricing (структура цены) =====
-  const updatePricingItem = (index, field, value) => {
+  // ===== Ценовая разбивка =====
+  const updatePricingItem = (index, field, value) =>
     setForm((prev) => {
       const pricing = [...prev.pricing];
-      const item = { ...pricing[index], [field]: value };
-      pricing[index] = item;
+      pricing[index] = { ...pricing[index], [field]: value };
       return { ...prev, pricing };
     });
-  };
-  const addPricingItem = () => {
+  const addPricingItem = () =>
     setForm((prev) => ({
       ...prev,
-      pricing: [
-        ...prev.pricing,
-        { label: '', sub: '', pct: 0, amount: 0, color: '#5C8A52' },
-      ],
+      pricing: [...prev.pricing, { label: '', sub: '', pct: 0, amount: 0, color: '#5C8A52' }],
     }));
-  };
-  const removePricingItem = (index) => {
-    setForm((prev) => ({
-      ...prev,
-      pricing: prev.pricing.filter((_, i) => i !== index),
-    }));
+  const removePricingItem = (index) =>
+    setForm((prev) => ({ ...prev, pricing: prev.pricing.filter((_, i) => i !== index) }));
+
+  // ===== Кастомизируемый состав набора =====
+  const startEditBundleItem = (item) => {
+    setEditingItem({ ...item, alternatives: item.alternatives ? [...item.alternatives] : [] });
+    setNewAltName('');
+    setNewAltEmoji('');
+    setBundleError('');
   };
 
+  const startAddBundleItem = () => {
+    setEditingItem({ ...EMPTY_BUNDLE_ITEM, alternatives: [] });
+    setNewAltName('');
+    setNewAltEmoji('');
+    setBundleError('');
+  };
+
+  const cancelEditBundleItem = () => {
+    setEditingItem(null);
+    setNewAltName('');
+    setNewAltEmoji('');
+    setBundleError('');
+  };
+
+  const saveBundleItem = async () => {
+    if (!editingItem?.itemName?.trim()) {
+      setBundleError('Укажите название позиции');
+      return;
+    }
+    setBundleItemSaving(true);
+    setBundleError('');
+    try {
+      const data = {
+        itemName: editingItem.itemName.trim(),
+        itemEmoji: editingItem.itemEmoji || '',
+        alternatives: editingItem.alternatives || [],
+        isRemovable: editingItem.isRemovable !== false,
+        sortOrder: editingItem.sortOrder ?? bundleComposition.length,
+      };
+      if (editingItem.id === 'new') {
+        const newItem = await api.addBundleItem(id, data);
+        setBundleComposition((prev) => [...prev, newItem]);
+      } else {
+        const updated = await api.updateBundleItem(id, editingItem.id, data);
+        setBundleComposition((prev) => prev.map((i) => (i.id === editingItem.id ? updated : i)));
+      }
+      setEditingItem(null);
+      setNewAltName('');
+      setNewAltEmoji('');
+    } catch (e) {
+      setBundleError(e.message);
+    } finally {
+      setBundleItemSaving(false);
+    }
+  };
+
+  const deleteBundleItem = async (itemId) => {
+    if (!window.confirm('Удалить позицию из состава?')) return;
+    setBundleError('');
+    try {
+      await api.deleteBundleItem(id, itemId);
+      setBundleComposition((prev) => prev.filter((i) => i.id !== itemId));
+      if (editingItem?.id === itemId) setEditingItem(null);
+    } catch (e) {
+      setBundleError(e.message);
+    }
+  };
+
+  const addAltToEditing = () => {
+    if (!newAltName.trim()) return;
+    setEditingItem((prev) => ({
+      ...prev,
+      alternatives: [...(prev.alternatives || []), { name: newAltName.trim(), emoji: newAltEmoji.trim() }],
+    }));
+    setNewAltName('');
+    setNewAltEmoji('');
+  };
+
+  const removeAltFromEditing = (index) =>
+    setEditingItem((prev) => ({
+      ...prev,
+      alternatives: prev.alternatives.filter((_, i) => i !== index),
+    }));
+
+  // ===== Сохранение товара =====
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
     if (!form.id.trim() || !form.title.trim() || !form.category) {
       setError('Заполните обязательные поля: ID, название, категория');
       return;
     }
-
     const payload = {
       ...form,
       price: Number(form.price) || 0,
@@ -155,8 +222,8 @@ export default function ProductForm() {
         pct: Number(p.pct) || 0,
         amount: Number(p.amount) || 0,
       })),
+      isBundle: form.isBundle === true,
     };
-
     setSaving(true);
     try {
       if (isNew) {
@@ -307,6 +374,19 @@ export default function ProductForm() {
                 onChange={(e) => updateField('isActive', e.target.checked)}
               />
               <label htmlFor="isActive">Показывать товар в приложении</label>
+            </div>
+
+            <div className="field checkbox-field full">
+              <input
+                id="isBundle"
+                type="checkbox"
+                checked={form.isBundle || false}
+                onChange={(e) => updateField('isBundle', e.target.checked)}
+              />
+              <label htmlFor="isBundle">Набор с кастомизируемым составом</label>
+              <div className="hint" style={{ marginTop: 4 }}>
+                Если включено, покупатели смогут изменить состав набора при оформлении заказа.
+              </div>
             </div>
           </div>
 
@@ -490,6 +570,312 @@ export default function ProductForm() {
             <div className="hint">Сумма процентов обычно должна равняться 100%.</div>
           </div>
         </div>
+
+        {/* Кастомизируемый состав — только для существующих товаров с isBundle */}
+        {form.isBundle && (
+          <div className="card" style={{ padding: 24, marginTop: 16 }}>
+            <div className="section-label" style={{ marginTop: 0 }}>Кастомизируемый состав набора</div>
+
+            {isNew ? (
+              <div className="hint">Сохраните товар сначала — затем добавьте позиции состава здесь.</div>
+            ) : (
+              <>
+                {bundleError && <div className="alert error" style={{ marginBottom: 12 }}>{bundleError}</div>}
+
+                {/* Список позиций */}
+                {bundleComposition.length > 0 && (
+                  <div className="repeat-list" style={{ marginBottom: 16 }}>
+                    {bundleComposition.map((item) => (
+                      <div
+                        key={item.id}
+                        style={{
+                          border: '1px solid #e5e7eb',
+                          borderRadius: 8,
+                          padding: '10px 14px',
+                          marginBottom: 8,
+                          background: editingItem?.id === item.id ? '#f0fdf4' : '#fff',
+                        }}
+                      >
+                        {editingItem?.id === item.id ? (
+                          /* Форма редактирования позиции */
+                          <div>
+                            <div className="form-grid" style={{ marginBottom: 10 }}>
+                              <div className="field" style={{ flex: '0 0 80px' }}>
+                                <label>Эмодзи</label>
+                                <input
+                                  type="text"
+                                  value={editingItem.itemEmoji}
+                                  onChange={(e) => setEditingItem((p) => ({ ...p, itemEmoji: e.target.value }))}
+                                  placeholder="🥕"
+                                />
+                              </div>
+                              <div className="field">
+                                <label>Название *</label>
+                                <input
+                                  type="text"
+                                  value={editingItem.itemName}
+                                  onChange={(e) => setEditingItem((p) => ({ ...p, itemName: e.target.value }))}
+                                  placeholder="например, Морковь"
+                                  autoFocus
+                                />
+                              </div>
+                              <div className="field checkbox-field" style={{ alignItems: 'center', paddingTop: 22 }}>
+                                <input
+                                  id={`removable-${item.id}`}
+                                  type="checkbox"
+                                  checked={editingItem.isRemovable !== false}
+                                  onChange={(e) => setEditingItem((p) => ({ ...p, isRemovable: e.target.checked }))}
+                                />
+                                <label htmlFor={`removable-${item.id}`}>Можно убрать</label>
+                              </div>
+                            </div>
+
+                            <div style={{ marginBottom: 10 }}>
+                              <div className="hint" style={{ marginBottom: 6 }}>Варианты замены:</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                                {(editingItem.alternatives || []).map((alt, ai) => (
+                                  <span
+                                    key={ai}
+                                    style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                                      background: '#f3f4f6', borderRadius: 16, padding: '3px 10px', fontSize: 13,
+                                    }}
+                                  >
+                                    {alt.emoji} {alt.name}
+                                    <button
+                                      type="button"
+                                      onClick={() => removeAltFromEditing(ai)}
+                                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 0, lineHeight: 1 }}
+                                    >
+                                      ×
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                                <div className="field" style={{ flex: '0 0 70px', marginBottom: 0 }}>
+                                  <label style={{ fontSize: 11 }}>Эмодзи</label>
+                                  <input
+                                    type="text"
+                                    value={newAltEmoji}
+                                    onChange={(e) => setNewAltEmoji(e.target.value)}
+                                    placeholder="🍅"
+                                  />
+                                </div>
+                                <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+                                  <label style={{ fontSize: 11 }}>Название замены</label>
+                                  <input
+                                    type="text"
+                                    value={newAltName}
+                                    onChange={(e) => setNewAltName(e.target.value)}
+                                    placeholder="например, Томаты"
+                                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addAltToEditing())}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  onClick={addAltToEditing}
+                                  disabled={!newAltName.trim()}
+                                  style={{ flexShrink: 0 }}
+                                >
+                                  + Добавить
+                                </button>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button
+                                type="button"
+                                className="btn-primary"
+                                onClick={saveBundleItem}
+                                disabled={bundleItemSaving}
+                              >
+                                {bundleItemSaving ? 'Сохранение…' : 'Сохранить'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                onClick={cancelEditBundleItem}
+                                disabled={bundleItemSaving}
+                              >
+                                Отмена
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Режим просмотра позиции */
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 20, flexShrink: 0 }}>{item.itemEmoji || '•'}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, fontSize: 14 }}>{item.itemName}</div>
+                              <div style={{ fontSize: 12, color: '#6b7280' }}>
+                                {item.isRemovable ? 'Можно убрать' : 'Нельзя убрать'}
+                                {item.alternatives?.length > 0 && (
+                                  <span> · Замены: {item.alternatives.map((a) => `${a.emoji} ${a.name}`).join(', ')}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                onClick={() => startEditBundleItem(item)}
+                                style={{ padding: '4px 10px', fontSize: 13 }}
+                              >
+                                Изменить
+                              </button>
+                              <button
+                                type="button"
+                                className="remove-btn"
+                                onClick={() => deleteBundleItem(item.id)}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Форма добавления новой позиции */}
+                {editingItem?.id === 'new' ? (
+                  <div
+                    style={{
+                      border: '1px dashed #9ca3af',
+                      borderRadius: 8,
+                      padding: '14px',
+                      marginBottom: 8,
+                      background: '#fafafa',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13 }}>Новая позиция</div>
+                    <div className="form-grid" style={{ marginBottom: 10 }}>
+                      <div className="field" style={{ flex: '0 0 80px' }}>
+                        <label>Эмодзи</label>
+                        <input
+                          type="text"
+                          value={editingItem.itemEmoji}
+                          onChange={(e) => setEditingItem((p) => ({ ...p, itemEmoji: e.target.value }))}
+                          placeholder="🥕"
+                        />
+                      </div>
+                      <div className="field">
+                        <label>Название *</label>
+                        <input
+                          type="text"
+                          value={editingItem.itemName}
+                          onChange={(e) => setEditingItem((p) => ({ ...p, itemName: e.target.value }))}
+                          placeholder="например, Морковь"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="field checkbox-field" style={{ alignItems: 'center', paddingTop: 22 }}>
+                        <input
+                          id="removable-new"
+                          type="checkbox"
+                          checked={editingItem.isRemovable !== false}
+                          onChange={(e) => setEditingItem((p) => ({ ...p, isRemovable: e.target.checked }))}
+                        />
+                        <label htmlFor="removable-new">Можно убрать</label>
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: 10 }}>
+                      <div className="hint" style={{ marginBottom: 6 }}>Варианты замены:</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                        {(editingItem.alternatives || []).map((alt, ai) => (
+                          <span
+                            key={ai}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              background: '#f3f4f6', borderRadius: 16, padding: '3px 10px', fontSize: 13,
+                            }}
+                          >
+                            {alt.emoji} {alt.name}
+                            <button
+                              type="button"
+                              onClick={() => removeAltFromEditing(ai)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 0, lineHeight: 1 }}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                        <div className="field" style={{ flex: '0 0 70px', marginBottom: 0 }}>
+                          <label style={{ fontSize: 11 }}>Эмодзи</label>
+                          <input
+                            type="text"
+                            value={newAltEmoji}
+                            onChange={(e) => setNewAltEmoji(e.target.value)}
+                            placeholder="🍅"
+                          />
+                        </div>
+                        <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+                          <label style={{ fontSize: 11 }}>Название замены</label>
+                          <input
+                            type="text"
+                            value={newAltName}
+                            onChange={(e) => setNewAltName(e.target.value)}
+                            placeholder="например, Томаты"
+                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addAltToEditing())}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={addAltToEditing}
+                          disabled={!newAltName.trim()}
+                          style={{ flexShrink: 0 }}
+                        >
+                          + Добавить
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={saveBundleItem}
+                        disabled={bundleItemSaving}
+                      >
+                        {bundleItemSaving ? 'Сохранение…' : 'Добавить'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={cancelEditBundleItem}
+                        disabled={bundleItemSaving}
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="add-row-btn"
+                    onClick={startAddBundleItem}
+                    disabled={!!editingItem}
+                  >
+                    + Добавить позицию
+                  </button>
+                )}
+
+                {bundleComposition.length === 0 && !editingItem && (
+                  <div className="hint" style={{ marginTop: 8 }}>
+                    Добавьте позиции, которые покупатель сможет кастомизировать (убрать или заменить).
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         <div className="form-actions">
           <button className="btn-primary" type="submit" disabled={saving}>

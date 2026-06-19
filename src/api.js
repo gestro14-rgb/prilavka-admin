@@ -162,6 +162,23 @@ export const api = {
       method: 'DELETE',
     }),
 
+  getBundleComposition: (productId) =>
+    request(`/api/admin/products/${productId}/composition`),
+  addBundleItem: (productId, data) =>
+    request(`/api/admin/products/${productId}/composition`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateBundleItem: (productId, itemId, data) =>
+    request(`/api/admin/products/${productId}/composition/${itemId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteBundleItem: (productId, itemId) =>
+    request(`/api/admin/products/${productId}/composition/${itemId}`, {
+      method: 'DELETE',
+    }),
+
   getStats: () => request('/api/admin/stats'),
 
   getDeliverySchedule: () => request('/api/admin/delivery-schedule'),
