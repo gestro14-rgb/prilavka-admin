@@ -110,7 +110,14 @@ export default function Orders() {
                   {o.deliveryDate ? `${o.deliveryDate.day || ''} ${o.deliveryDate.date || ''}`.trim() : '—'}
                   {o.deliverySlot ? `, ${o.deliverySlot}` : ''}
                 </div>
-                <div>{o.addressStreet || 'Адрес не указан'}</div>
+                <div>
+                  {o.addressStreet || 'Адрес не указан'}
+                  {o.leaveAtDoor && (
+                    <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 700, color: '#6B7280', background: '#F3F4F6', borderRadius: 6, padding: '1px 6px' }}>
+                      🚪 У двери
+                    </span>
+                  )}
+                </div>
                 {o.addressDetails && <div>{formatAddressDetails(o.addressDetails)}</div>}
                 {o.addressDetails?.comment && <div>💬 {o.addressDetails.comment}</div>}
                 {o.comment && <div>💬 Комментарий к заказу: {o.comment}</div>}
