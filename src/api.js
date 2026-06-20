@@ -179,6 +179,13 @@ export const api = {
       method: 'DELETE',
     }),
 
+  getSettings: () => request('/api/admin/settings'),
+  updateSetting: (key, value) =>
+    request(`/api/admin/settings/${key}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+    }),
+
   getStats: () => request('/api/admin/stats'),
 
   getDeliverySchedule: () => request('/api/admin/delivery-schedule'),
