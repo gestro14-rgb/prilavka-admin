@@ -48,6 +48,21 @@ async function request(path, options = {}) {
   return body;
 }
 
+export async function uploadImage(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_URL}/api/admin/upload-image`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: formData,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || 'Ошибка загрузки изображения');
+  }
+  return (await res.json()).url;
+}
+
 export const api = {
   login: (username, password) =>
     request('/api/admin/login', {
