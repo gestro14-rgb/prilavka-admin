@@ -15,6 +15,7 @@ import Rewards from './Rewards';
 import Reviews from './Reviews';
 import Deliveries from './Deliveries';
 import Districts from './Districts';
+import Subcategories from './Subcategories';
 import Settings from './Settings';
 
 function ProtectedRoute({ children }) {
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="products" element={<ProductsList />} />
         <Route path="products/:id" element={<ProductForm />} />
         <Route path="categories" element={<Categories />} />
+        <Route path="subcategories" element={<Subcategories />} />
         <Route path="delivery-zone" element={<DeliveryZone />} />
         <Route path="promo-codes" element={<PromoCodes />} />
         <Route path="users" element={<Users />} />

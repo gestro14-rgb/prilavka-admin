@@ -100,6 +100,20 @@ export const api = {
       method: 'DELETE',
     }),
 
+  getSubcategories: () => request('/api/admin/subcategories'),
+  createSubcategory: (data) =>
+    request('/api/admin/subcategories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateSubcategory: (id, data) =>
+    request(`/api/admin/subcategories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteSubcategory: (id) =>
+    request(`/api/admin/subcategories/${id}`, { method: 'DELETE' }),
+
   getDistricts: () => request('/api/admin/districts'),
   createDistrict: (data) =>
     request('/api/admin/districts', {

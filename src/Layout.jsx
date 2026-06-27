@@ -31,6 +31,9 @@ export default function Layout() {
           <NavLink to="/categories" className={({ isActive }) => (isActive ? 'active' : '')}>
             🏷️ Категории
           </NavLink>
+          <NavLink to="/subcategories" className={({ isActive }) => (isActive ? 'active' : '')}>
+            📂 Подкатегории
+          </NavLink>
           <NavLink to="/delivery-zone" className={({ isActive }) => (isActive ? 'active' : '')}>
             📍 Зона доставки
           </NavLink>
