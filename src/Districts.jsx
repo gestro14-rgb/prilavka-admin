@@ -112,7 +112,7 @@ export default function Districts() {
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="например, Тропарево"
+              placeholder="например, Тропарёво"
               required
             />
           </div>
