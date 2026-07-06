@@ -8,6 +8,7 @@ const SETTING_META = {
   referral_discount:        { label: 'Скидка по реферальному коду',            unit: '₽',    type: 'number' },
   max_points_spend_percent: { label: 'Макс. % суммы заказа для оплаты баллами', unit: '%',   type: 'number' },
   default_slot:             { label: 'Стандартное время доставки',             unit: '',     type: 'text'   },
+  review_photo_points:      { label: 'Баллы за отзыв с фото',                  unit: 'балл', type: 'number' },
 };
 
 export default function Settings() {
@@ -48,6 +49,7 @@ export default function Settings() {
     'max_points_spend_percent',
     'referral_discount',
     'referral_points_reward',
+    'review_photo_points',
     'default_slot',
   ];
 
