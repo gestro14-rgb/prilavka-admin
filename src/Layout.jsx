@@ -55,6 +55,9 @@ export default function Layout() {
           <NavLink to="/deliveries" className={({ isActive }) => (isActive ? 'active' : '')}>
             🚚 Доставки
           </NavLink>
+          <NavLink to="/analytics" className={({ isActive }) => (isActive ? 'active' : '')}>
+            📈 Аналитика
+          </NavLink>
           <NavLink to="/settings" className={({ isActive }) => (isActive ? 'active' : '')}>
             ⚙️ Настройки
           </NavLink>

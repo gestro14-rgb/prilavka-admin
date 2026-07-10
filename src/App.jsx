@@ -16,6 +16,7 @@ import Reviews from './Reviews';
 import Deliveries from './Deliveries';
 import Districts from './Districts';
 import Subcategories from './Subcategories';
+import Analytics from './Analytics';
 import Settings from './Settings';
 
 function ProtectedRoute({ children }) {
@@ -60,6 +61,7 @@ export default function App() {
         <Route path="reviews" element={<Reviews />} />
         <Route path="deliveries" element={<Deliveries />} />
         <Route path="districts" element={<Districts />} />
+        <Route path="analytics" element={<Analytics />} />
         <Route path="settings" element={<Settings />} />
       </Route>
 

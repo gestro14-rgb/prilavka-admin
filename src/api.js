@@ -227,6 +227,27 @@ export const api = {
 
   getStats: () => request('/api/admin/stats'),
 
+  getAnalyticsFunnel: ({ from, to } = {}) => {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    return request(`/api/admin/analytics/funnel?${params}`);
+  },
+  getAnalyticsTopScreens: ({ from, to } = {}) => {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    return request(`/api/admin/analytics/top-screens?${params}`);
+  },
+  getAnalyticsSessions: ({ from, to, userId } = {}) => {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    if (userId) params.set('user_id', userId);
+    return request(`/api/admin/analytics/sessions?${params}`);
+  },
+  getAnalyticsSession: (sessionId) => request(`/api/admin/analytics/sessions/${encodeURIComponent(sessionId)}`),
+
   getDeliverySchedule: () => request('/api/admin/delivery-schedule'),
   upsertDeliverySchedule: (data) =>
     request('/api/admin/delivery-schedule', {
