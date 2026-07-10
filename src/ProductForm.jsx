@@ -80,6 +80,7 @@ const EMPTY_PRODUCT = {
   sortOrder: 0,
   imageUrl: '',
   isBundle: false,
+  subcategoryId: null,
 };
 
 const BADGE_TYPES = [
@@ -113,6 +114,14 @@ export default function ProductForm() {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Подкатегории — та же связь categories → subcategories, что и в разделе
+  // "Подкатегории" админки; список зависит от выбранной категории товара.
+  const [subcategories, setSubcategories] = useState([]);
+  useEffect(() => {
+    api.getSubcategories().then(setSubcategories).catch(() => {});
+  }, []);
+  const availableSubcategories = subcategories.filter((sc) => sc.categoryId === form.category);
 
   // Пищевая ценность на 100 г (опционально)
   const [nutrition, setNutrition] = useState(EMPTY_NUTRITION);
@@ -149,6 +158,11 @@ export default function ProductForm() {
 
   // ===== Основные поля =====
   const updateField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
+
+  // Смена категории сбрасывает подкатегорию — иначе останется несовместимая
+  // пара (подкатегория другой категории, которую пользователь больше не видит).
+  const updateCategory = (value) =>
+    setForm((prev) => ({ ...prev, category: value, subcategoryId: null }));
 
   const updateBadgeField = (field, value) =>
     setForm((prev) => {
@@ -407,7 +421,7 @@ export default function ProductForm() {
               <select
                 id="category"
                 value={form.category}
-                onChange={(e) => updateField('category', e.target.value)}
+                onChange={(e) => updateCategory(e.target.value)}
               >
                 {CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>
@@ -415,6 +429,25 @@ export default function ProductForm() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="field">
+              <label htmlFor="subcategory">Подкатегория (опционально)</label>
+              <select
+                id="subcategory"
+                value={form.subcategoryId ?? ''}
+                onChange={(e) => updateField('subcategoryId', e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">Без подкатегории</option>
+                {availableSubcategories.map((sc) => (
+                  <option key={sc.id} value={sc.id}>
+                    {sc.name}
+                  </option>
+                ))}
+              </select>
+              {availableSubcategories.length === 0 && (
+                <div className="hint">Для этой категории подкатегорий пока нет</div>
+              )}
             </div>
 
             <div className="field">
