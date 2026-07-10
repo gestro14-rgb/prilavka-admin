@@ -41,8 +41,15 @@ async function request(path, options = {}) {
   const body = contentType.includes('application/json') ? await res.json() : null;
 
   if (!res.ok) {
+    // Некоторые ручки (например, удаление подкатегории с привязанными
+    // товарами) возвращают структурированную ошибку, которую вызывающий код
+    // должен прочитать (например, чтобы показать точное число товаров в
+    // диалоге подтверждения) — не только текстовое сообщение.
     const message = body?.error || `Ошибка запроса: ${res.status}`;
-    throw new Error(message);
+    const err = new Error(message);
+    err.status = res.status;
+    err.body = body;
+    throw err;
   }
 
   return body;
@@ -111,8 +118,11 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
-  deleteSubcategory: (id) =>
-    request(`/api/admin/subcategories/${id}`, { method: 'DELETE' }),
+  // force: true — подтверждённое удаление, даже если к подкатегории привязаны
+  // товары (их subcategory_id станет NULL). Без force бэкенд вернёт 409 с
+  // { error: 'has_products', count } вместо удаления.
+  deleteSubcategory: (id, { force = false } = {}) =>
+    request(`/api/admin/subcategories/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
 
   getDistricts: () => request('/api/admin/districts'),
   createDistrict: (data) =>

@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
 
+// Русское склонение по числу: pluralRu(3, 'товар', 'товара', 'товаров') → 'товара'
+function pluralRu(n, one, few, many) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
+
 export default function Subcategories() {
   const [subcategories, setSubcategories] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -17,7 +25,7 @@ export default function Subcategories() {
         setCategories(cats);
         const initialEdits = {};
         scs.forEach((sc) => {
-          initialEdits[sc.id] = { name: sc.name, sortOrder: sc.sortOrder };
+          initialEdits[sc.id] = { name: sc.name, sortOrder: sc.sortOrder, categoryId: sc.categoryId };
         });
         setEdits(initialEdits);
       })
@@ -35,6 +43,7 @@ export default function Subcategories() {
       await api.updateSubcategory(id, {
         name: edits[id].name,
         sortOrder: Number(edits[id].sortOrder),
+        categoryId: edits[id].categoryId,
       });
       load();
     } catch (e) {
@@ -52,7 +61,27 @@ export default function Subcategories() {
       await api.deleteSubcategory(id);
       load();
     } catch (e) {
-      setError(e.message);
+      // 409 с { error: 'has_products', count } — к подкатегории привязаны
+      // товары. Предупреждаем явно (не удаляем молча) и переспрашиваем
+      // отдельным подтверждением с конкретным числом; при согласии повторяем
+      // запрос с force=true — бэкенд отвяжет товары (subcategory_id → NULL)
+      // и удалит подкатегорию.
+      if (e.status === 409 && e.body?.error === 'has_products') {
+        const count = e.body.count;
+        const confirmed = window.confirm(
+          `К этой подкатегории привязано ${count} ${pluralRu(count, 'товар', 'товара', 'товаров')} — при удалении их подкатегория станет пустой (subcategory_id = NULL). Продолжить?`
+        );
+        if (confirmed) {
+          try {
+            await api.deleteSubcategory(id, { force: true });
+            load();
+          } catch (e2) {
+            setError(e2.message);
+          }
+        }
+      } else {
+        setError(e.message);
+      }
     } finally {
       setDeleting(null);
     }
@@ -104,6 +133,7 @@ export default function Subcategories() {
                 <thead>
                   <tr>
                     <th>Название</th>
+                    <th style={{ width: 180 }}>Категория</th>
                     <th style={{ width: 100 }}>Порядок</th>
                     <th></th>
                   </tr>
@@ -123,6 +153,24 @@ export default function Subcategories() {
                           }
                           style={{ width: '100%' }}
                         />
+                      </td>
+                      <td>
+                        <select
+                          value={edits[sc.id]?.categoryId ?? sc.categoryId}
+                          onChange={(e) =>
+                            setEdits((prev) => ({
+                              ...prev,
+                              [sc.id]: { ...prev[sc.id], categoryId: e.target.value },
+                            }))
+                          }
+                          style={{ width: '100%' }}
+                        >
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.label}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td>
                         <input
