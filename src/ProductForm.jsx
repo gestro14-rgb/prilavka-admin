@@ -98,6 +98,11 @@ const CATEGORIES = [
 
 const EMPTY_BUNDLE_ITEM = { id: 'new', itemName: '', itemEmoji: '', alternatives: [], isRemovable: true };
 
+// Пищевая ценность на 100 г — опциональный блок, хранится отдельно от form,
+// потому что значения в инпутах должны быть строками (в т.ч. пустыми), а
+// в products.nutrition (JSON) — числами или null для составных товаров.
+const EMPTY_NUTRITION = { calories: '', protein: '', fat: '', carbs: '' };
+
 export default function ProductForm() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -108,6 +113,9 @@ export default function ProductForm() {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Пищевая ценность на 100 г (опционально)
+  const [nutrition, setNutrition] = useState(EMPTY_NUTRITION);
 
   // Кастомизируемый состав набора
   const [bundleComposition, setBundleComposition] = useState([]);
@@ -124,6 +132,16 @@ export default function ProductForm() {
       .then((p) => {
         setForm({ ...EMPTY_PRODUCT, ...p, badge: p.badge || null, isBundle: p.isBundle || false });
         setBundleComposition(p.bundleComposition || []);
+        setNutrition(
+          p.nutrition
+            ? {
+                calories: p.nutrition.calories ?? '',
+                protein: p.nutrition.protein ?? '',
+                fat: p.nutrition.fat ?? '',
+                carbs: p.nutrition.carbs ?? '',
+              }
+            : EMPTY_NUTRITION
+        );
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -137,6 +155,9 @@ export default function ProductForm() {
       const badge = prev.badge || { type: '', label: '' };
       return { ...prev, badge: { ...badge, [field]: value } };
     });
+
+  const updateNutritionField = (field, value) =>
+    setNutrition((prev) => ({ ...prev, [field]: value }));
 
   // ===== Состав (ингредиенты для ценовой разбивки) =====
   const updateCompositionItem = (index, field, value) =>
@@ -272,6 +293,19 @@ export default function ProductForm() {
       setError('Заполните обязательные поля: ID, название, категория');
       return;
     }
+    // Пищевая ценность опциональна целиком: если ни одно поле не заполнено —
+    // nutrition = null (наборы и товары без данных), иначе собираем полный
+    // объект (пустые поля внутри заполненного блока считаются нулём).
+    const nutritionFilled = Object.values(nutrition).some((v) => v !== '' && v !== null && v !== undefined);
+    const nutritionPayload = nutritionFilled
+      ? {
+          calories: Math.round(Number(nutrition.calories) || 0),
+          protein: Number(nutrition.protein) || 0,
+          fat: Number(nutrition.fat) || 0,
+          carbs: Number(nutrition.carbs) || 0,
+        }
+      : null;
+
     const payload = {
       ...form,
       price: Number(form.price) || 0,
@@ -285,6 +319,7 @@ export default function ProductForm() {
         amount: Number(p.amount) || 0,
       })),
       isBundle: form.isBundle === true,
+      nutrition: nutritionPayload,
     };
     setSaving(true);
     try {
@@ -476,6 +511,63 @@ export default function ProductForm() {
                 placeholder="например, Хит"
                 disabled={!form.badge?.type}
               />
+            </div>
+          </div>
+
+          <div className="section-label">Пищевая ценность на 100 г (опционально)</div>
+          <div className="form-grid">
+            <div className="field">
+              <label htmlFor="nutCalories">Калории, ккал</label>
+              <input
+                id="nutCalories"
+                type="number"
+                min="0"
+                step="1"
+                value={nutrition.calories}
+                onChange={(e) => updateNutritionField('calories', e.target.value)}
+                placeholder="например, 52"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="nutProtein">Белки, г</label>
+              <input
+                id="nutProtein"
+                type="number"
+                min="0"
+                step="0.1"
+                value={nutrition.protein}
+                onChange={(e) => updateNutritionField('protein', e.target.value)}
+                placeholder="например, 1.1"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="nutFat">Жиры, г</label>
+              <input
+                id="nutFat"
+                type="number"
+                min="0"
+                step="0.1"
+                value={nutrition.fat}
+                onChange={(e) => updateNutritionField('fat', e.target.value)}
+                placeholder="например, 0.2"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="nutCarbs">Углеводы, г</label>
+              <input
+                id="nutCarbs"
+                type="number"
+                min="0"
+                step="0.1"
+                value={nutrition.carbs}
+                onChange={(e) => updateNutritionField('carbs', e.target.value)}
+                placeholder="например, 11.3"
+              />
+            </div>
+            <div className="field full">
+              <div className="hint">
+                Оставьте все поля пустыми, если пищевая ценность не применима (например, у наборов).
+              </div>
             </div>
           </div>
 
