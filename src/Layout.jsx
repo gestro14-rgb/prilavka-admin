@@ -52,11 +52,11 @@ export default function Layout() {
           <NavLink to="/reviews" className={({ isActive }) => (isActive ? 'active' : '')}>
             ⭐ Отзывы
           </NavLink>
-          <NavLink to="/deliveries" className={({ isActive }) => (isActive ? 'active' : '')}>
-            🚚 Доставки
-          </NavLink>
           <NavLink to="/analytics" className={({ isActive }) => (isActive ? 'active' : '')}>
             📈 Аналитика
+          </NavLink>
+          <NavLink to="/home-content" className={({ isActive }) => (isActive ? 'active' : '')}>
+            🏠 Главная страница
           </NavLink>
           <NavLink to="/settings" className={({ isActive }) => (isActive ? 'active' : '')}>
             ⚙️ Настройки

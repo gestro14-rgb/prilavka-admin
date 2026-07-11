@@ -13,10 +13,10 @@ import PromoCodes from './PromoCodes';
 import Users from './Users';
 import Rewards from './Rewards';
 import Reviews from './Reviews';
-import Deliveries from './Deliveries';
 import Districts from './Districts';
 import Subcategories from './Subcategories';
 import Analytics from './Analytics';
+import HomeContent from './HomeContent';
 import Settings from './Settings';
 
 function ProtectedRoute({ children }) {
@@ -59,9 +59,9 @@ export default function App() {
         <Route path="users" element={<Users />} />
         <Route path="rewards" element={<Rewards />} />
         <Route path="reviews" element={<Reviews />} />
-        <Route path="deliveries" element={<Deliveries />} />
         <Route path="districts" element={<Districts />} />
         <Route path="analytics" element={<Analytics />} />
+        <Route path="home-content" element={<HomeContent />} />
         <Route path="settings" element={<Settings />} />
       </Route>
 

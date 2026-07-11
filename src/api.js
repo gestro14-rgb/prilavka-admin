@@ -196,8 +196,31 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  updateDelivery: (id, data) =>
+    request(`/api/admin/deliveries/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
   deleteDelivery: (id) =>
     request(`/api/admin/deliveries/${id}`, {
+      method: 'DELETE',
+    }),
+
+  // Ручные подборки товаров для витрин Главной ("Хиты недели" /
+  // "Сейчас в сезоне") — shelf: 'hits' | 'seasonal'.
+  getHomeShelf: (shelf) => request(`/api/admin/home-shelves?shelf=${encodeURIComponent(shelf)}`),
+  addToHomeShelf: (data) =>
+    request('/api/admin/home-shelves', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateHomeShelfItem: (id, data) =>
+    request(`/api/admin/home-shelves/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  removeFromHomeShelf: (id) =>
+    request(`/api/admin/home-shelves/${id}`, {
       method: 'DELETE',
     }),
 
