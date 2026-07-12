@@ -16,6 +16,7 @@ const EMPTY_PRODUCT = {
   suppliers: [],
   pricing: [],
   isActive: true,
+  inStock: true,
   sortOrder: 0,
   imageUrl: '',
   homeImageUrl: '',
@@ -465,6 +466,21 @@ export default function ProductForm() {
                 onChange={(e) => updateField('isActive', e.target.checked)}
               />
               <label htmlFor="isActive">Показывать товар в приложении</label>
+            </div>
+
+            <div className="field checkbox-field full">
+              <input
+                id="inStock"
+                type="checkbox"
+                checked={form.inStock === false}
+                onChange={(e) => updateField('inStock', !e.target.checked)}
+              />
+              <label htmlFor="inStock">Товар закончился</label>
+              <div className="hint" style={{ marginTop: 4 }}>
+                В отличие от «Показывать товар в приложении» — товар остаётся
+                в каталоге, но с серым фото, бейджем «Разобрали» и кнопкой
+                «Сообщить о завозе» вместо «В корзину» (DESIGN.md §4.1).
+              </div>
             </div>
 
             <div className="field checkbox-field full">
