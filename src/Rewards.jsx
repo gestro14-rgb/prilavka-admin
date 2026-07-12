@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
+import ImageUploadField from './ImageUploadField';
 
 export default function Rewards() {
   const [rewards, setRewards] = useState(null);
@@ -10,6 +11,7 @@ export default function Rewards() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [emoji, setEmoji] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [pointsCost, setPointsCost] = useState('');
 
   const load = () => {
@@ -32,12 +34,14 @@ export default function Rewards() {
         title: title.trim(),
         description: description.trim() || null,
         emoji: emoji.trim() || null,
+        imageUrl: imageUrl || null,
         pointsCost: Number(pointsCost),
       });
       setSuccess('Награда создана');
       setTitle('');
       setDescription('');
       setEmoji('');
+      setImageUrl('');
       setPointsCost('');
       load();
     } catch (e) {
@@ -51,6 +55,16 @@ export default function Rewards() {
     setError('');
     try {
       await api.updateReward(reward.id, { isActive: !reward.isActive });
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const handleImageChange = async (reward, url) => {
+    setError('');
+    try {
+      await api.updateReward(reward.id, { imageUrl: url || null });
       load();
     } catch (e) {
       setError(e.message);
@@ -123,6 +137,10 @@ export default function Rewards() {
               />
             </div>
           </div>
+          <div className="field" style={{ marginTop: 12 }}>
+            <label>Фотография (необязательно — без неё показывается эмодзи)</label>
+            <ImageUploadField value={imageUrl} onChange={setImageUrl} label="Фото награды" />
+          </div>
           <div className="form-actions">
             <button className="btn-primary" type="submit" disabled={saving}>
               {saving ? 'Создание…' : 'Создать награду'}
@@ -142,6 +160,7 @@ export default function Rewards() {
           <thead>
             <tr>
               <th></th>
+              <th>Фото</th>
               <th>Название</th>
               <th>Описание</th>
               <th>Баллы</th>
@@ -153,6 +172,13 @@ export default function Rewards() {
             {rewards.map((r) => (
               <tr key={r.id} style={{ opacity: r.isActive ? 1 : 0.5 }}>
                 <td style={{ fontSize: 22, textAlign: 'center' }}>{r.emoji || '—'}</td>
+                <td>
+                  <ImageUploadField
+                    value={r.imageUrl || ''}
+                    onChange={(url) => handleImageChange(r, url)}
+                    label={`Фото награды «${r.title}»`}
+                  />
+                </td>
                 <td><b>{r.title}</b></td>
                 <td style={{ color: 'var(--text-soft, #888)' }}>{r.description || '—'}</td>
                 <td><b>{r.pointsCost.toLocaleString('ru-RU')}</b></td>
