@@ -106,6 +106,13 @@ export const api = {
     request(`/api/admin/categories/${id}`, {
       method: 'DELETE',
     }),
+  // order — массив id категорий в желаемом порядке (все существующие,
+  // ровно по одному разу); бэкенд перезаписывает sort_order целиком.
+  reorderCategories: (order) =>
+    request('/api/admin/categories/reorder', {
+      method: 'PUT',
+      body: JSON.stringify({ order }),
+    }),
 
   getSubcategories: () => request('/api/admin/subcategories'),
   createSubcategory: (data) =>

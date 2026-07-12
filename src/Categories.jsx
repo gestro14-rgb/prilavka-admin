@@ -8,6 +8,7 @@ export default function Categories() {
   const [newLabel, setNewLabel] = useState('');
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [reorderingId, setReorderingId] = useState(null);
 
   const load = () => {
     api
@@ -29,7 +30,9 @@ export default function Categories() {
       await api.createCategory({
         id: newId.trim(),
         label: newLabel.trim(),
-        sortOrder: (categories?.length || 0) + 1,
+        // Шаг 10, как у PUT /api/admin/categories/reorder — иначе новая
+        // категория (1,2,3…) окажется раньше уже переупорядоченных (10,20…).
+        sortOrder: ((categories?.length || 0) + 1) * 10,
       });
       setNewId('');
       setNewLabel('');
@@ -38,6 +41,31 @@ export default function Categories() {
       setError(e.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // direction: -1 = вверх, +1 = вниз. Меняем местами с соседом и одним
+  // запросом перезаписываем sort_order всего списка (см. комментарий у
+  // PUT /api/admin/categories/reorder) — не только у переставленных двух.
+  const handleMove = async (index, direction) => {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= categories.length) return;
+
+    const reordered = categories.slice();
+    [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
+
+    const movedId = categories[index].id;
+    setReorderingId(movedId);
+    setError('');
+    setCategories(reordered); // оптимистично — без ожидания ответа сервера
+    try {
+      const saved = await api.reorderCategories(reordered.map((c) => c.id));
+      setCategories(saved);
+    } catch (e) {
+      setError(e.message);
+      load(); // откат к реальному состоянию на сервере
+    } finally {
+      setReorderingId(null);
     }
   };
 
@@ -70,14 +98,39 @@ export default function Categories() {
           <table className="product-table">
             <thead>
               <tr>
+                <th style={{ width: 70 }}>Порядок</th>
                 <th>ID</th>
                 <th>Название</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {categories.map((c) => (
+              {categories.map((c, i) => (
                 <tr key={c.id}>
+                  <td>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        className="btn-secondary"
+                        style={{ padding: '4px 8px', minWidth: 0 }}
+                        onClick={() => handleMove(i, -1)}
+                        disabled={i === 0 || reorderingId !== null}
+                        aria-label={`Поднять «${c.label}»`}
+                        title="Выше"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        className="btn-secondary"
+                        style={{ padding: '4px 8px', minWidth: 0 }}
+                        onClick={() => handleMove(i, 1)}
+                        disabled={i === categories.length - 1 || reorderingId !== null}
+                        aria-label={`Опустить «${c.label}»`}
+                        title="Ниже"
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  </td>
                   <td>{c.id}</td>
                   <td>{c.label}</td>
                   <td>
