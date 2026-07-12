@@ -30,6 +30,17 @@ const BADGE_TYPES = [
   { value: 'hit', label: 'Хит' },
 ];
 
+// 4 предустановленных акцента дизайн-системы (DESIGN.md §1) — не свободный
+// RGB-пикер, чтобы не размывать палитру. Пусто = цвет по умолчанию для
+// выбранного типа метки (см. HitBadge/EcoBadge/Badge на фронте).
+const BADGE_COLORS = [
+  { value: '', label: 'По умолчанию' },
+  { value: '#1C8F1C', label: 'Зелёный' },
+  { value: '#D07812', label: 'Оранжевый' },
+  { value: '#153F15', label: 'Тёмно-зелёный' },
+  { value: '#5A5550', label: 'Серый' },
+];
+
 const CATEGORIES = [
   { value: 'bundles', label: 'Наборы' },
   { value: 'vegetables', label: 'Овощи' },
@@ -496,6 +507,21 @@ export default function ProductForm() {
                 placeholder="например, Хит"
                 disabled={!form.badge?.type}
               />
+            </div>
+            <div className="field">
+              <label htmlFor="badgeColor">Цвет метки</label>
+              <select
+                id="badgeColor"
+                value={form.badge?.color || ''}
+                onChange={(e) => updateBadgeField('color', e.target.value)}
+                disabled={!form.badge?.type}
+              >
+                {BADGE_COLORS.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
