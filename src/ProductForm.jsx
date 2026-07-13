@@ -5,6 +5,7 @@ import ImageUploadField from './ImageUploadField';
 
 const EMPTY_PRODUCT = {
   id: '',
+  slug: '',
   title: '',
   price: 0,
   weight: '',
@@ -328,8 +329,23 @@ export default function ProductForm() {
               />
               <div className="hint">
                 {isNew
-                  ? 'Латиницей, без пробелов. Используется во ссылках, изменить позже нельзя.'
-                  : 'ID товара изменить нельзя после создания.'}
+                  ? 'Латиницей, без пробелов. Используется во внутренних связях (отзывы, наборы, подборки), изменить позже нельзя.'
+                  : 'ID товара изменить нельзя после создания — это внутренняя связь, не показывается покупателю. Для переименования используйте поле "Слаг" ниже.'}
+              </div>
+            </div>
+
+            <div className="field">
+              <label htmlFor="slug">Слаг (можно менять)</label>
+              <input
+                id="slug"
+                type="text"
+                value={form.slug}
+                onChange={(e) => updateField('slug', e.target.value)}
+                placeholder="например, tomato"
+              />
+              <div className="hint">
+                Человекочитаемый идентификатор для админки — в отличие от ID, можно менять в любой
+                момент. Не используется в ссылках приложения.
               </div>
             </div>
 
