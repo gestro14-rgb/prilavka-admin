@@ -4,15 +4,18 @@
 // Эквайринг считается в % от цены ПРОДАЖИ, а не от закупки — значит он
 // зависит от того самого P, который мы вычисляем. Наивный расчёт (взять
 // эквайринг от закупочной цены) занижает комиссию и завышает
-// рекомендованную цену. Правильно — решить уравнение относительно P:
+// рекомендованную цену. Списания (waste%) тоже накручиваются на себестоимость
+// проданной единицы: закупка и упаковка непроданного (испортившегося) товара
+// должна быть отбита с того, что реально продалось — Cw = (закупка+упаковка)
+// / (1-waste%). Эквайринг внутри той же скобки в исходной формуле, поэтому
+// его коэффициент растягивается тем же (1-waste%): aw = эквайринг% / (1-waste%).
 //
-//   P = (закупка + упаковка + P × эквайринг% + доля_постоянных) × (1 + маржа)
+//   P = (Cw + P × aw + доля_постоянных) × (1 + маржа)
 //
-// Обозначим C = закупка + упаковка + доля_постоянных (не зависит от P),
-// a = эквайринг/100, m = маржа/100. Тогда:
+// Обозначим D = Cw + доля_постоянных (не зависит от P), m = маржа/100. Тогда:
 //
-//   цена_безубыточности = C / (1 - a)
-//   рекомендуемая_цена  = C × (1 + m) / (1 - a × (1 + m))
+//   цена_безубыточности = D / (1 - aw)
+//   рекомендуемая_цена  = D × (1 + m) / (1 - aw × (1 + m))
 //
 // "Маржа" здесь — наценка на себестоимость (cost-plus), а не % от выручки.
 
@@ -22,27 +25,37 @@ export function calcPricing({ purchasePrice, settings }) {
   const packagingCostPerUnit = Number(settings?.packagingCostPerUnit) || 0;
   const acquiringPercent = Number(settings?.acquiringPercent) || 0;
   const defaultMarginPercent = Number(settings?.defaultMarginPercent) || 0;
+  const wastePercent = Number(settings?.wastePercent) || 0;
 
   if (plannedSalesMonthly <= 0) {
     return { error: 'Заполните настройки ценообразования, чтобы видеть рекомендации' };
   }
 
-  const a = acquiringPercent / 100;
-  const m = defaultMarginPercent / 100;
-  const denominatorBreakEven = 1 - a;
-  const denominatorRecommended = 1 - a * (1 + m);
-
-  if (denominatorBreakEven <= 0 || denominatorRecommended <= 0) {
-    return { error: 'Комиссия эквайринга слишком высока относительно маржи — проверьте настройки ценообразования' };
+  const w = wastePercent / 100;
+  if (w >= 1) {
+    return { error: 'Процент списаний не может быть 100% и больше — проверьте настройки ценообразования' };
   }
 
+  const a = acquiringPercent / 100;
+  const m = defaultMarginPercent / 100;
   const fixedShare = fixedCostsMonthly / plannedSalesMonthly;
-  const cost = Number(purchasePrice) + packagingCostPerUnit + fixedShare;
 
-  const breakEvenPrice = cost / denominatorBreakEven;
-  const recommendedPrice = (cost * (1 + m)) / denominatorRecommended;
-  const acquiringCostAtRecommended = recommendedPrice * a;
-  const unitCost = Number(purchasePrice) + packagingCostPerUnit + acquiringCostAtRecommended;
+  const wasteAdjustedGoodsCost = (Number(purchasePrice) + packagingCostPerUnit) / (1 - w);
+  const wasteAdjustedAcquiring = a / (1 - w);
+  const costBeforeAcquiring = wasteAdjustedGoodsCost + fixedShare;
+
+  const denominatorBreakEven = 1 - wasteAdjustedAcquiring;
+  const denominatorRecommended = 1 - wasteAdjustedAcquiring * (1 + m);
+
+  if (denominatorBreakEven <= 0 || denominatorRecommended <= 0) {
+    return { error: 'Комиссия эквайринга и списания в сумме слишком высоки относительно маржи — проверьте настройки ценообразования' };
+  }
+
+  const breakEvenPrice = costBeforeAcquiring / denominatorBreakEven;
+  const recommendedPrice = (costBeforeAcquiring * (1 + m)) / denominatorRecommended;
+  const acquiringCostAtRecommended = recommendedPrice * wasteAdjustedAcquiring;
+  // Себестоимость единицы — уже с поправкой на списания (wasteAdjustedGoodsCost).
+  const unitCost = wasteAdjustedGoodsCost + acquiringCostAtRecommended;
 
   return { fixedShare, unitCost, breakEvenPrice, recommendedPrice };
 }
@@ -55,4 +68,15 @@ export function pricingStatus(currentPrice, { breakEvenPrice, recommendedPrice }
   if (price >= recommendedPrice) return 'green';
   if (price >= breakEvenPrice) return 'yellow';
   return 'red';
+}
+
+// Какую маржу и прибыль на единицу реально даёт ТЕКУЩАЯ установленная цена
+// (в отличие от recommendedPrice — это подсказка "куда стремиться", а не
+// то, что сейчас происходит). Прибыль = текущая цена − безубыток: та же
+// база (breakEvenPrice), что и в pricingStatus, чтобы цифры не расходились.
+export function calcCurrentPriceMargin(currentPrice, { breakEvenPrice }) {
+  const price = Number(currentPrice) || 0;
+  const profitPerUnit = price - breakEvenPrice;
+  const marginPercent = breakEvenPrice > 0 ? (profitPerUnit / breakEvenPrice) * 100 : 0;
+  return { profitPerUnit, marginPercent };
 }

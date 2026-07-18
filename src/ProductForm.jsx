@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from './api';
 import ImageUploadField from './ImageUploadField';
-import { calcPricing, pricingStatus } from './pricingCalc';
+import { calcPricing, pricingStatus, calcCurrentPriceMargin } from './pricingCalc';
 
 const EMPTY_PRODUCT = {
   id: '',
@@ -34,6 +34,11 @@ const PRICING_STATUS_LABEL = {
   green: 'Цена ≥ рекомендуемой — хорошая маржа',
   yellow: 'В плюсе, но маржа ниже желаемой',
   red: 'Цена ниже себестоимости — убыток',
+};
+const PRICING_STATUS_VERDICT = {
+  green: 'Хорошая прибыль',
+  yellow: 'Тонкая маржа',
+  red: 'Убыток!',
 };
 
 const fmtRub = (n) => Math.round(n).toLocaleString('ru-RU');
@@ -106,6 +111,9 @@ export default function ProductForm() {
     : null;
   const pricingIndicatorColor = pricingResult && !pricingResult.error
     ? pricingStatus(Number(form.price) || 0, pricingResult)
+    : null;
+  const currentPriceMargin = pricingIndicatorColor
+    ? calcCurrentPriceMargin(form.price, pricingResult)
     : null;
 
   // Пищевая ценность на 100 г (опционально)
@@ -478,6 +486,21 @@ export default function ProductForm() {
                         Подставить рекомендуемую
                       </button>
                     </div>
+
+                    {currentPriceMargin && Number(form.price) > 0 && (
+                      <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px dashed var(--line)' }}>
+                        <div style={{
+                          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                          gap: '6px 20px', fontSize: 13, color: 'var(--ink)', marginBottom: 8,
+                        }}>
+                          <div>Маржа по текущей цене: <b>{currentPriceMargin.marginPercent.toFixed(1)}%</b></div>
+                          <div>Прибыль с единицы: <b>{fmtRub(currentPriceMargin.profitPerUnit)} ₽</b></div>
+                        </div>
+                        <div style={{ fontWeight: 800, fontSize: 13, color: PRICING_STATUS_COLOR[pricingIndicatorColor] }}>
+                          {PRICING_STATUS_VERDICT[pricingIndicatorColor]}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
