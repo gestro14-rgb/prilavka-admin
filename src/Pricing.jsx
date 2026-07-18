@@ -27,7 +27,16 @@ const FIELDS = [
     key: 'plannedSalesMonthly',
     label: 'Планируемое число продаж в месяц',
     unit: 'шт',
-    hint: 'Сколько заказов/продаж вы рассчитываете делать в месяц — на это число делятся постоянные расходы, чтобы получить долю на единицу товара.',
+    hint: 'Сколько заказов/продаж вы рассчитываете делать в месяц — на это число делятся постоянные расходы, чтобы получить долю на заказ.',
+  },
+  {
+    key: 'avgItemsPerOrder',
+    label: 'Среднее число товаров в заказе',
+    unit: 'шт',
+    hint: 'Сколько в среднем разных товаров покупают в одном заказе. Используется, чтобы правильно разделить постоянные расходы между товарами внутри заказа, а не относить их целиком к каждому товару.',
+    nullable: true,
+    min: 1,
+    step: 1,
   },
   {
     key: 'packagingCostPerUnit',
@@ -57,6 +66,10 @@ const FIELDS = [
 
 const EMPTY = Object.fromEntries(FIELDS.map((f) => [f.key, '']));
 
+// null (не заполнено, см. migrations/035 — avgItemsPerOrder) → пустая
+// строка в поле, а не "0", чтобы не выглядело как осознанно введённый ноль.
+const toDisplayValue = (v) => (v == null ? '' : String(v));
+
 export default function Pricing() {
   const [values, setValues] = useState(EMPTY);
   const [loading, setLoading] = useState(true);
@@ -67,7 +80,7 @@ export default function Pricing() {
   useEffect(() => {
     api.getPricingSettings()
       .then((data) => {
-        setValues(Object.fromEntries(FIELDS.map((f) => [f.key, String(data[f.key] ?? 0)])));
+        setValues(Object.fromEntries(FIELDS.map((f) => [f.key, toDisplayValue(data[f.key])])));
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -83,9 +96,14 @@ export default function Pricing() {
     setSaving(true);
     setError('');
     try {
-      const payload = Object.fromEntries(FIELDS.map((f) => [f.key, Number(values[f.key]) || 0]));
+      const payload = Object.fromEntries(FIELDS.map((f) => {
+        if (f.nullable) {
+          return [f.key, values[f.key] === '' ? null : Number(values[f.key]) || null];
+        }
+        return [f.key, Number(values[f.key]) || 0];
+      }));
       const updated = await api.updatePricingSettings(payload);
-      setValues(Object.fromEntries(FIELDS.map((f) => [f.key, String(updated[f.key] ?? 0)])));
+      setValues(Object.fromEntries(FIELDS.map((f) => [f.key, toDisplayValue(updated[f.key])])));
       setSaved(true);
     } catch (e) {
       setError(e.message);
@@ -102,6 +120,10 @@ export default function Pricing() {
   const totalFixedCosts = rent + salary + other;
   const plannedSales = Number(values.plannedSalesMonthly) || 0;
   const fixedCostPerOrder = plannedSales > 0 ? totalFixedCosts / plannedSales : null;
+  const avgItemsPerOrder = Number(values.avgItemsPerOrder) || 0;
+  const fixedCostPerItem = fixedCostPerOrder != null && avgItemsPerOrder > 0
+    ? fixedCostPerOrder / avgItemsPerOrder
+    : null;
 
   return (
     <div>
@@ -129,10 +151,11 @@ export default function Pricing() {
                   <div style={{ position: 'relative' }}>
                     <input
                       type="number"
-                      min="0"
-                      step="any"
+                      min={f.min ?? 0}
+                      step={f.step ?? 'any'}
                       value={values[f.key]}
                       onChange={(e) => handleChange(f.key, e.target.value)}
+                      placeholder={f.nullable ? 'не настроено' : undefined}
                       style={{ paddingRight: 40 }}
                     />
                     <span style={{
@@ -166,11 +189,21 @@ export default function Pricing() {
                 Постоянных расходов на заказ:{' '}
                 <b>{fixedCostPerOrder != null ? `${fixedCostPerOrder.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽` : '—'}</b>
               </div>
+              <div>
+                Постоянных расходов на товар (при среднем чеке из {avgItemsPerOrder > 0 ? avgItemsPerOrder : '—'} позиций):{' '}
+                <b>{fixedCostPerItem != null ? `${fixedCostPerItem.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽` : '—'}</b>
+              </div>
               <div>Средний % списаний: <b>{(Number(values.wastePercent) || 0).toLocaleString('ru-RU')}%</b></div>
             </div>
             {plannedSales <= 0 && (
               <div className="hint" style={{ marginTop: 10 }}>
                 Укажите планируемое число продаж в месяц — без него доля постоянных расходов не считается.
+              </div>
+            )}
+            {plannedSales > 0 && avgItemsPerOrder <= 0 && (
+              <div className="hint" style={{ marginTop: 10 }}>
+                Укажите среднее число товаров в заказе — без него расходы на товар не считаются
+                (и рекомендуемая цена на карточках товаров тоже не появится).
               </div>
             )}
           </div>

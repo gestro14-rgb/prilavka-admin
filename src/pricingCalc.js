@@ -26,9 +26,18 @@ export function calcPricing({ purchasePrice, settings }) {
   const acquiringPercent = Number(settings?.acquiringPercent) || 0;
   const defaultMarginPercent = Number(settings?.defaultMarginPercent) || 0;
   const wastePercent = Number(settings?.wastePercent) || 0;
+  const avgItemsPerOrder = settings?.avgItemsPerOrder != null ? Number(settings.avgItemsPerOrder) : null;
 
   if (plannedSalesMonthly <= 0) {
     return { error: 'Заполните настройки ценообразования, чтобы видеть рекомендации' };
+  }
+
+  // avgItemsPerOrder не заполнен (null) — намеренно, а не 0/по умолчанию 1
+  // (см. migrations/035): раньше вся доля постоянных на заказ ошибочно
+  // относилась целиком к одному товару, как будто в заказе всегда одна
+  // позиция. Дефолт 1 маскировал бы эту же ошибку под видом "настроено".
+  if (!avgItemsPerOrder || avgItemsPerOrder <= 0) {
+    return { error: 'Укажите среднее число товаров в заказе в настройках ценообразования, чтобы точно распределить постоянные расходы' };
   }
 
   const w = wastePercent / 100;
@@ -38,7 +47,12 @@ export function calcPricing({ purchasePrice, settings }) {
 
   const a = acquiringPercent / 100;
   const m = defaultMarginPercent / 100;
-  const fixedShare = fixedCostsMonthly / plannedSalesMonthly;
+  // Постоянные расходы делятся дважды: сначала на число заказов (доля на
+  // заказ), потом на среднее число позиций внутри заказа (доля на товар) —
+  // раньше второго деления не было, и вся доля на заказ ошибочно приписывалась
+  // одному товару.
+  const fixedSharePerOrder = fixedCostsMonthly / plannedSalesMonthly;
+  const fixedShare = fixedSharePerOrder / avgItemsPerOrder;
 
   const wasteAdjustedGoodsCost = (Number(purchasePrice) + packagingCostPerUnit) / (1 - w);
   const wasteAdjustedAcquiring = a / (1 - w);
