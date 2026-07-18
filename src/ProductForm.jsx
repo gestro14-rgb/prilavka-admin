@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from './api';
 import ImageUploadField from './ImageUploadField';
+import { calcPricing, pricingStatus } from './pricingCalc';
 
 const EMPTY_PRODUCT = {
   id: '',
@@ -23,7 +24,19 @@ const EMPTY_PRODUCT = {
   homeImageUrl: '',
   isBundle: false,
   subcategoryId: null,
+  // Nullable — у уже заведённых товаров пусто, пока их не откроют и не
+  // заполнят задним числом. '' в форме, null на бэкенде, см. handleSubmit.
+  purchasePrice: '',
 };
+
+const PRICING_STATUS_COLOR = { green: '#1C8F1C', yellow: '#D07812', red: 'var(--danger)' };
+const PRICING_STATUS_LABEL = {
+  green: 'Цена ≥ рекомендуемой — хорошая маржа',
+  yellow: 'В плюсе, но маржа ниже желаемой',
+  red: 'Цена ниже себестоимости — убыток',
+};
+
+const fmtRub = (n) => Math.round(n).toLocaleString('ru-RU');
 
 const BADGE_TYPES = [
   { value: '', label: 'Без метки' },
@@ -76,6 +89,25 @@ export default function ProductForm() {
   }, []);
   const availableSubcategories = subcategories.filter((sc) => sc.categoryId === form.category);
 
+  // Настройки модуля ценообразования (раздел "Ценообразование" в сайдбаре)
+  // — грузим один раз, дальше calcPricing() пересчитывается на каждый ввод
+  // закупочной цены чисто на фронте, без похода на сервер.
+  const [pricingSettings, setPricingSettings] = useState(null);
+  const [pricingSettingsError, setPricingSettingsError] = useState('');
+  useEffect(() => {
+    api.getPricingSettings()
+      .then(setPricingSettings)
+      .catch((e) => setPricingSettingsError(e.message));
+  }, []);
+
+  const purchasePriceNum = form.purchasePrice !== '' && form.purchasePrice != null ? Number(form.purchasePrice) : null;
+  const pricingResult = purchasePriceNum != null && pricingSettings
+    ? calcPricing({ purchasePrice: purchasePriceNum, settings: pricingSettings })
+    : null;
+  const pricingIndicatorColor = pricingResult && !pricingResult.error
+    ? pricingStatus(Number(form.price) || 0, pricingResult)
+    : null;
+
   // Пищевая ценность на 100 г (опционально)
   const [nutrition, setNutrition] = useState(EMPTY_NUTRITION);
 
@@ -92,7 +124,7 @@ export default function ProductForm() {
     api
       .getProduct(id)
       .then((p) => {
-        setForm({ ...EMPTY_PRODUCT, ...p, badge: p.badge || null, isBundle: p.isBundle || false });
+        setForm({ ...EMPTY_PRODUCT, ...p, badge: p.badge || null, isBundle: p.isBundle || false, purchasePrice: p.purchasePrice ?? '' });
         setBundleComposition(p.bundleComposition || []);
         setNutrition(
           p.nutrition
@@ -276,6 +308,7 @@ export default function ProductForm() {
     const payload = {
       ...form,
       price: Number(form.price) || 0,
+      purchasePrice: form.purchasePrice !== '' && form.purchasePrice != null ? Number(form.purchasePrice) : null,
       sortOrder: Number(form.sortOrder) || 0,
       badge: form.badge && form.badge.type ? form.badge : null,
       composition: form.composition.filter((row) => row[0] || row[1]),
@@ -363,15 +396,92 @@ export default function ProductForm() {
 
             <div className="field">
               <label htmlFor="price">Цена, ₽</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="price"
+                  type="number"
+                  min="0"
+                  value={form.price}
+                  onChange={(e) => updateField('price', e.target.value)}
+                  required
+                  style={pricingIndicatorColor ? { paddingRight: 34 } : undefined}
+                />
+                {pricingIndicatorColor && (
+                  <span
+                    title={PRICING_STATUS_LABEL[pricingIndicatorColor]}
+                    style={{
+                      position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                      width: 12, height: 12, borderRadius: '50%',
+                      background: PRICING_STATUS_COLOR[pricingIndicatorColor],
+                    }}
+                  />
+                )}
+              </div>
+              {pricingIndicatorColor === 'red' && (
+                <div className="hint" style={{ color: 'var(--danger)', fontWeight: 700 }}>
+                  ⚠ Цена ниже себестоимости — вы продаёте в убыток!
+                </div>
+              )}
+            </div>
+
+            <div className="field">
+              <label htmlFor="purchasePrice">Закупочная цена, ₽</label>
               <input
-                id="price"
+                id="purchasePrice"
                 type="number"
                 min="0"
-                value={form.price}
-                onChange={(e) => updateField('price', e.target.value)}
-                required
+                step="any"
+                value={form.purchasePrice ?? ''}
+                onChange={(e) => updateField('purchasePrice', e.target.value)}
+                placeholder="например, 120"
               />
+              <div className="hint">
+                Сколько вы платите поставщику за единицу. Необязательно — пока
+                пусто, расчёт рекомендуемой цены ниже просто не показывается.
+              </div>
             </div>
+
+            {purchasePriceNum != null && (
+              <div className="field full">
+                {pricingSettingsError ? (
+                  <div className="hint" style={{ color: 'var(--danger)' }}>
+                    Не удалось загрузить настройки ценообразования: {pricingSettingsError}
+                  </div>
+                ) : !pricingSettings ? (
+                  <div className="hint">Загрузка настроек ценообразования…</div>
+                ) : pricingResult.error ? (
+                  <div className="hint" style={{ color: 'var(--danger)' }}>{pricingResult.error}</div>
+                ) : (
+                  <div style={{ background: 'var(--surface)', borderRadius: 12, padding: '16px 18px' }}>
+                    <div style={{
+                      display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                      gap: '6px 20px', fontSize: 13, color: 'var(--ink)', marginBottom: 16,
+                    }}>
+                      <div>Себестоимость единицы: <b>{fmtRub(pricingResult.unitCost)} ₽</b></div>
+                      <div>Доля постоянных расходов: <b>{fmtRub(pricingResult.fixedShare)} ₽</b></div>
+                      <div>Цена безубыточности: <b>{fmtRub(pricingResult.breakEvenPrice)} ₽</b></div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                      <div>
+                        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--ink-soft)', fontWeight: 800 }}>
+                          Рекомендуемая цена
+                        </div>
+                        <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--accent)' }}>
+                          {fmtRub(pricingResult.recommendedPrice)} ₽
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => updateField('price', String(Math.round(pricingResult.recommendedPrice)))}
+                      >
+                        Подставить рекомендуемую
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="field">
               <label htmlFor="weight">Вес / описание объёма</label>

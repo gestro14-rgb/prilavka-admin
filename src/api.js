@@ -255,6 +255,13 @@ export const api = {
       body: JSON.stringify({ value }),
     }),
 
+  getPricingSettings: () => request('/api/admin/pricing-settings'),
+  updatePricingSettings: (data) =>
+    request('/api/admin/pricing-settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
   getStats: () => request('/api/admin/stats'),
 
   getAnalyticsFunnel: ({ from, to } = {}) => {

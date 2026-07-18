@@ -18,6 +18,7 @@ import Subcategories from './Subcategories';
 import Analytics from './Analytics';
 import HomeContent from './HomeContent';
 import Settings from './Settings';
+import Pricing from './Pricing';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -63,6 +64,7 @@ export default function App() {
         <Route path="analytics" element={<Analytics />} />
         <Route path="home-content" element={<HomeContent />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="pricing" element={<Pricing />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

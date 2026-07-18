@@ -61,6 +61,9 @@ export default function Layout() {
           <NavLink to="/settings" className={({ isActive }) => (isActive ? 'active' : '')}>
             ⚙️ Настройки
           </NavLink>
+          <NavLink to="/pricing" className={({ isActive }) => (isActive ? 'active' : '')}>
+            💰 Ценообразование
+          </NavLink>
         </nav>
         <button className="logout-btn" onClick={handleLogout}>
           ⎋ Выйти
