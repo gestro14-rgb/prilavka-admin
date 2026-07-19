@@ -33,6 +33,9 @@ const EMPTY_PRODUCT = {
   // weight ("700 г", "1 пучок") остаётся витринным описанием и не парсится.
   pricingUnit: 'piece',
   weightKg: '',
+  // Индивидуальная маржа товара (%, необязательно) — верхний уровень
+  // приоритета маржи: товар → подкатегория → глобальная (migrations/038).
+  individualMarginPercent: '',
 };
 
 const PRICING_STATUS_COLOR = { green: '#1C8F1C', yellow: '#D07812', red: 'var(--danger)' };
@@ -111,17 +114,14 @@ export default function ProductForm() {
       .catch((e) => setPricingSettingsError(e.message));
   }, []);
 
-  // Категории из БД — только ради целевой маржи (migrations/037); селект
-  // категории в форме по-прежнему использует статический список CATEGORIES.
-  const [dbCategories, setDbCategories] = useState([]);
-  useEffect(() => {
-    api.getCategories().then(setDbCategories).catch(() => {});
-  }, []);
-  const dbCategory = dbCategories.find((c) => c.id === form.category);
-  // target_margin_percent — сырая строка NUMERIC из Postgres, null = у
-  // категории нет своей маржи (действует глобальная из настроек).
-  const categoryMarginPercent = dbCategory?.target_margin_percent != null
-    ? Number(dbCategory.target_margin_percent)
+  // Приоритет целевой маржи (migrations/038): индивидуальная маржа товара →
+  // маржа подкатегории → глобальная настройка. Подкатегория берётся из уже
+  // загруженного списка subcategories; String() с обеих сторон — в форме
+  // subcategoryId живёт строкой из <select>, в DTO приходит числом.
+  const currentSubcategory = subcategories.find((sc) => String(sc.id) === String(form.subcategoryId ?? ''));
+  const subcategoryMarginPercent = currentSubcategory?.targetMarginPercent ?? null;
+  const productMarginPercent = form.individualMarginPercent !== '' && form.individualMarginPercent != null
+    ? Number(form.individualMarginPercent)
     : null;
 
   const purchasePriceNum = form.purchasePrice !== '' && form.purchasePrice != null ? Number(form.purchasePrice) : null;
@@ -133,7 +133,7 @@ export default function ProductForm() {
     weightKg: form.weightKg,
   });
   const pricingResult = effectiveCost != null && pricingSettings
-    ? calcPricing({ purchasePrice: effectiveCost, settings: pricingSettings, categoryMarginPercent })
+    ? calcPricing({ purchasePrice: effectiveCost, settings: pricingSettings, productMarginPercent, subcategoryMarginPercent })
     : null;
   const pricingIndicatorColor = pricingResult && !pricingResult.error
     ? pricingStatus(Number(form.price) || 0, pricingResult)
@@ -166,6 +166,7 @@ export default function ProductForm() {
           purchasePrice: p.purchasePrice ?? '',
           pricingUnit: p.pricingUnit || 'piece',
           weightKg: p.weightKg ?? '',
+          individualMarginPercent: p.individualMarginPercent ?? '',
         });
         setBundleComposition(p.bundleComposition || []);
         setNutrition(
@@ -353,6 +354,7 @@ export default function ProductForm() {
       purchasePrice: form.purchasePrice !== '' && form.purchasePrice != null ? Number(form.purchasePrice) : null,
       pricingUnit: form.pricingUnit === 'kg' ? 'kg' : 'piece',
       weightKg: form.pricingUnit === 'kg' && form.weightKg !== '' ? Number(form.weightKg) : null,
+      individualMarginPercent: form.individualMarginPercent !== '' ? Number(form.individualMarginPercent) : null,
       sortOrder: Number(form.sortOrder) || 0,
       badge: form.badge && form.badge.type ? form.badge : null,
       composition: form.composition.filter((row) => row[0] || row[1]),
@@ -525,6 +527,24 @@ export default function ProductForm() {
               </div>
             )}
 
+            <div className="field">
+              <label htmlFor="individualMarginPercent">Индивидуальная маржа, % (необязательно)</label>
+              <input
+                id="individualMarginPercent"
+                type="number"
+                min="0"
+                step="any"
+                value={form.individualMarginPercent ?? ''}
+                onChange={(e) => updateField('individualMarginPercent', e.target.value)}
+                placeholder="маржа подкатегории или общая"
+              />
+              <div className="hint">
+                Для акционных товаров или исключений — переопределяет маржу подкатегории.
+                Пусто — действует маржа подкатегории, а если и её нет, общая настройка
+                из раздела «Ценообразование».
+              </div>
+            </div>
+
             {purchasePriceNum != null && (
               <div className="field full">
                 {pricingSettingsError ? (
@@ -554,9 +574,11 @@ export default function ProductForm() {
                       <div>
                         Целевая маржа: <b>{pricingResult.marginPercent.toLocaleString('ru-RU')}%</b>{' '}
                         <span style={{ color: 'var(--ink-soft)' }}>
-                          {pricingResult.marginSource === 'category'
-                            ? `(категория${dbCategory?.label ? ` «${dbCategory.label}»` : ''})`
-                            : '(глобальная настройка)'}
+                          {pricingResult.marginSource === 'product'
+                            ? '(индивидуальная)'
+                            : pricingResult.marginSource === 'subcategory'
+                              ? `(подкатегория${currentSubcategory?.name ? ` «${currentSubcategory.name}»` : ''})`
+                              : '(общая настройка)'}
                         </span>
                       </div>
                     </div>

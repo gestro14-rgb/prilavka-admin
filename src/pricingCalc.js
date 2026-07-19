@@ -35,10 +35,12 @@ export function effectivePurchaseCost({ purchasePrice, pricingUnit, weightKg }) 
   return Number(purchasePrice);
 }
 
-// categoryMarginPercent — целевая маржа категории товара (migrations/037).
-// Двухуровневый приоритет: маржа категории, если задана, иначе глобальная
-// defaultMarginPercent из настроек. Уровня "маржа товара" сознательно нет.
-export function calcPricing({ purchasePrice, settings, categoryMarginPercent }) {
+// Приоритет целевой маржи (migrations/038): индивидуальная маржа товара →
+// маржа подкатегории товара → глобальная defaultMarginPercent из настроек.
+// Сравнение через != null: 0 — валидная индивидуальная маржа ("продаём по
+// себестоимости"), не признак "не задано". У товара без подкатегории
+// уровень подкатегории пропускается (subcategoryMarginPercent придёт null).
+export function calcPricing({ purchasePrice, settings, productMarginPercent, subcategoryMarginPercent }) {
   const fixedCostsMonthly = Number(settings?.fixedCostsMonthly) || 0;
   const plannedSalesMonthly = Number(settings?.plannedSalesMonthly) || 0;
   const packagingCostPerUnit = Number(settings?.packagingCostPerUnit) || 0;
@@ -65,7 +67,15 @@ export function calcPricing({ purchasePrice, settings, categoryMarginPercent }) 
   }
 
   const a = acquiringPercent / 100;
-  const marginPercent = categoryMarginPercent != null ? Number(categoryMarginPercent) : defaultMarginPercent;
+  let marginPercent = defaultMarginPercent;
+  let marginSource = 'global';
+  if (productMarginPercent != null) {
+    marginPercent = Number(productMarginPercent);
+    marginSource = 'product';
+  } else if (subcategoryMarginPercent != null) {
+    marginPercent = Number(subcategoryMarginPercent);
+    marginSource = 'subcategory';
+  }
   const m = marginPercent / 100;
   // Постоянные расходы делятся дважды: сначала на число заказов (доля на
   // заказ), потом на среднее число позиций внутри заказа (доля на товар) —
@@ -107,9 +117,10 @@ export function calcPricing({ purchasePrice, settings, categoryMarginPercent }) 
     breakEvenPrice,
     recommendedPrice,
     premiumPrice,
-    // Какая маржа реально применена и откуда — для подписи в UI.
+    // Какая маржа реально применена и откуда ('product' | 'subcategory' |
+    // 'global') — для подписи в UI.
     marginPercent,
-    marginSource: categoryMarginPercent != null ? 'category' : 'global',
+    marginSource,
   };
 }
 

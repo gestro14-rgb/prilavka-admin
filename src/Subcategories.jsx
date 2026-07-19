@@ -25,7 +25,14 @@ export default function Subcategories() {
         setCategories(cats);
         const initialEdits = {};
         scs.forEach((sc) => {
-          initialEdits[sc.id] = { name: sc.name, sortOrder: sc.sortOrder, categoryId: sc.categoryId };
+          initialEdits[sc.id] = {
+            name: sc.name,
+            sortOrder: sc.sortOrder,
+            categoryId: sc.categoryId,
+            // null (маржа не задана — действует глобальная) → пустая строка
+            // в инпуте, а не "0": ноль — валидная маржа "по себестоимости".
+            targetMarginPercent: sc.targetMarginPercent != null ? String(sc.targetMarginPercent) : '',
+          };
         });
         setEdits(initialEdits);
       })
@@ -44,6 +51,7 @@ export default function Subcategories() {
         name: edits[id].name,
         sortOrder: Number(edits[id].sortOrder),
         categoryId: edits[id].categoryId,
+        targetMarginPercent: edits[id].targetMarginPercent === '' ? null : Number(edits[id].targetMarginPercent),
       });
       load();
     } catch (e) {
@@ -117,6 +125,12 @@ export default function Subcategories() {
 
       {error && <div className="alert error">{error}</div>}
 
+      <div className="hint" style={{ marginBottom: 16 }}>
+        Целевая маржа подкатегории используется в расчёте рекомендуемой цены её товаров
+        (если у товара не задана индивидуальная маржа). Пусто — действует глобальная
+        маржа из раздела «Ценообразование».
+      </div>
+
       {categories.map((cat) => {
         const items = subcategories.filter((sc) => sc.categoryId === cat.id);
         const newItem = newItems[cat.id] || { name: '', sortOrder: 0 };
@@ -135,6 +149,7 @@ export default function Subcategories() {
                     <th>Название</th>
                     <th style={{ width: 180 }}>Категория</th>
                     <th style={{ width: 100 }}>Порядок</th>
+                    <th style={{ width: 140 }}>Целевая маржа, %</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -183,6 +198,23 @@ export default function Subcategories() {
                             }))
                           }
                           style={{ width: 80 }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={edits[sc.id]?.targetMarginPercent ?? ''}
+                          onChange={(e) =>
+                            setEdits((prev) => ({
+                              ...prev,
+                              [sc.id]: { ...prev[sc.id], targetMarginPercent: e.target.value },
+                            }))
+                          }
+                          placeholder="глобальная"
+                          aria-label={`Целевая маржа подкатегории «${sc.name}»`}
+                          style={{ width: 110 }}
                         />
                       </td>
                       <td>

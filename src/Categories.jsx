@@ -9,23 +9,11 @@ export default function Categories() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [reorderingId, setReorderingId] = useState(null);
-  // Черновики целевой маржи по id категории — строки инпутов; сохраняются
-  // по уходу из поля (blur), если значение реально изменилось.
-  const [marginDrafts, setMarginDrafts] = useState({});
-  const [marginSavingId, setMarginSavingId] = useState(null);
-
-  // target_margin_percent приходит сырой строкой NUMERIC из Postgres
-  // (эндпоинт отдаёт строки таблицы как есть); null — маржа не задана,
-  // действует глобальная из настроек ценообразования.
-  const toMarginDraft = (c) => (c.target_margin_percent != null ? String(Number(c.target_margin_percent)) : '');
 
   const load = () => {
     api
       .getCategories()
-      .then((list) => {
-        setCategories(list);
-        setMarginDrafts(Object.fromEntries(list.map((c) => [c.id, toMarginDraft(c)])));
-      })
+      .then(setCategories)
       .catch((e) => setError(e.message));
   };
 
@@ -81,29 +69,6 @@ export default function Categories() {
     }
   };
 
-  const handleMarginBlur = async (c) => {
-    const draft = marginDrafts[c.id] ?? '';
-    if (draft === toMarginDraft(c)) return; // не менялось — не дёргаем сервер
-    const value = draft === '' ? null : Number(draft);
-    if (value !== null && (!Number.isFinite(value) || value < 0)) {
-      setError('Целевая маржа должна быть неотрицательным числом');
-      setMarginDrafts((d) => ({ ...d, [c.id]: toMarginDraft(c) }));
-      return;
-    }
-    setMarginSavingId(c.id);
-    setError('');
-    try {
-      const updated = await api.updateCategory(c.id, { targetMarginPercent: value });
-      setCategories((list) => list.map((row) => (row.id === c.id ? updated : row)));
-      setMarginDrafts((d) => ({ ...d, [c.id]: toMarginDraft(updated) }));
-    } catch (e) {
-      setError(e.message);
-      setMarginDrafts((d) => ({ ...d, [c.id]: toMarginDraft(c) }));
-    } finally {
-      setMarginSavingId(null);
-    }
-  };
-
   const handleDelete = async (id, label) => {
     if (!window.confirm(`Удалить категорию «${label}»?`)) return;
     setDeletingId(id);
@@ -136,7 +101,6 @@ export default function Categories() {
                 <th style={{ width: 70 }}>Порядок</th>
                 <th>ID</th>
                 <th>Название</th>
-                <th style={{ width: 160 }}>Целевая маржа, %</th>
                 <th></th>
               </tr>
             </thead>
@@ -170,20 +134,6 @@ export default function Categories() {
                   <td>{c.id}</td>
                   <td>{c.label}</td>
                   <td>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={marginDrafts[c.id] ?? ''}
-                      onChange={(e) => setMarginDrafts((d) => ({ ...d, [c.id]: e.target.value }))}
-                      onBlur={() => handleMarginBlur(c)}
-                      placeholder="глобальная"
-                      disabled={marginSavingId === c.id}
-                      aria-label={`Целевая маржа категории «${c.label}»`}
-                      style={{ width: 120 }}
-                    />
-                  </td>
-                  <td>
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                       <button
                         className="btn-danger"
@@ -198,11 +148,6 @@ export default function Categories() {
               ))}
             </tbody>
           </table>
-          <div className="hint" style={{ padding: '10px 16px' }}>
-            Целевая маржа категории используется в расчёте рекомендуемой цены её товаров.
-            Пусто — действует глобальная маржа из раздела «Ценообразование». Сохраняется
-            при уходе из поля.
-          </div>
         </div>
       )}
 

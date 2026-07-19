@@ -3,18 +3,19 @@ import { api } from './api';
 import { calcPricing, calcCurrentPriceMargin, effectivePurchaseCost, pricingStatus } from './pricingCalc';
 
 // Аналитика цен по каталогу — считается на лету при открытии страницы из
-// уже существующих данных (товары + категории + настройки ценообразования),
+// уже существующих данных (товары + подкатегории + настройки ценообразования),
 // ничего не пишет в БД и не имеет кнопки массового пересчёта (сознательно).
 // Учитываются все товары с заполненной закупочной ценой, включая скрытые
 // (is_active = false) — закупка у них есть, значит экономика тоже.
 
 const STATUS_COLOR = { green: '#1C8F1C', yellow: '#D07812', red: 'var(--danger)' };
 
-function summarize(products, categories, settings) {
-  // target_margin_percent — сырая строка NUMERIC из Postgres (эндпоинт
-  // категорий отдаёт строки таблицы как есть), null = маржа не задана.
-  const marginByCategory = Object.fromEntries(
-    categories.map((c) => [c.id, c.target_margin_percent != null ? Number(c.target_margin_percent) : null])
+function summarize(products, subcategories, settings) {
+  // Приоритет маржи (migrations/038): индивидуальная маржа товара → маржа
+  // подкатегории → глобальная из настроек; товар без подкатегории пропускает
+  // средний уровень (в карте его просто нет → null).
+  const marginBySubcategory = Object.fromEntries(
+    subcategories.map((sc) => [sc.id, sc.targetMarginPercent])
   );
 
   const s = {
@@ -44,7 +45,8 @@ function summarize(products, categories, settings) {
     const result = calcPricing({
       purchasePrice: cost,
       settings,
-      categoryMarginPercent: marginByCategory[p.category] ?? null,
+      productMarginPercent: p.individualMarginPercent ?? null,
+      subcategoryMarginPercent: p.subcategoryId != null ? (marginBySubcategory[p.subcategoryId] ?? null) : null,
     });
     if (result.error) {
       // Настройки неполные — ошибка одна и та же для всех товаров, дальше
@@ -83,16 +85,16 @@ function StatCard({ label, value, color, hint }) {
 }
 
 export default function PriceAnalytics() {
-  const [data, setData] = useState(null); // { products, categories, settings }
+  const [data, setData] = useState(null); // { products, subcategories, settings }
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([api.getProducts(), api.getCategories(), api.getPricingSettings()])
-      .then(([products, categories, settings]) => setData({ products, categories, settings }))
+    Promise.all([api.getProducts(), api.getSubcategories(), api.getPricingSettings()])
+      .then(([products, subcategories, settings]) => setData({ products, subcategories, settings }))
       .catch((e) => setError(e.message));
   }, []);
 
-  const summary = data ? summarize(data.products, data.categories, data.settings) : null;
+  const summary = data ? summarize(data.products, data.subcategories, data.settings) : null;
   const computable = summary ? summary.loss + summary.thin + summary.good : 0;
 
   return (
@@ -156,7 +158,7 @@ export default function PriceAnalytics() {
 
               <div className="hint">
                 Считается при открытии страницы по текущим ценам, закупкам и настройкам
-                ценообразования (маржа: категория → глобальная). Ничего не сохраняется в базу.
+                ценообразования (маржа: товар → подкатегория → общая). Ничего не сохраняется в базу.
               </div>
             </>
           )}
