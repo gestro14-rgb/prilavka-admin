@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from './api';
 import ImageUploadField from './ImageUploadField';
-import { calcPricing, pricingStatus, calcCurrentPriceMargin } from './pricingCalc';
+import { calcPricing, pricingStatus, calcCurrentPriceMargin, effectivePurchaseCost } from './pricingCalc';
 
 const EMPTY_PRODUCT = {
   id: '',
@@ -27,6 +27,12 @@ const EMPTY_PRODUCT = {
   // Nullable — у уже заведённых товаров пусто, пока их не откроют и не
   // заполнят задним числом. '' в форме, null на бэкенде, см. handleSubmit.
   purchasePrice: '',
+  // 'piece' — закупка как есть за единицу; 'kg' — закупка за килограмм,
+  // эффективная закупка упаковки = закупка × weightKg (migrations/036).
+  // weightKg — структурированный вес в кг только для расчёта; текстовое
+  // weight ("700 г", "1 пучок") остаётся витринным описанием и не парсится.
+  pricingUnit: 'piece',
+  weightKg: '',
 };
 
 const PRICING_STATUS_COLOR = { green: '#1C8F1C', yellow: '#D07812', red: 'var(--danger)' };
@@ -105,9 +111,29 @@ export default function ProductForm() {
       .catch((e) => setPricingSettingsError(e.message));
   }, []);
 
+  // Категории из БД — только ради целевой маржи (migrations/037); селект
+  // категории в форме по-прежнему использует статический список CATEGORIES.
+  const [dbCategories, setDbCategories] = useState([]);
+  useEffect(() => {
+    api.getCategories().then(setDbCategories).catch(() => {});
+  }, []);
+  const dbCategory = dbCategories.find((c) => c.id === form.category);
+  // target_margin_percent — сырая строка NUMERIC из Postgres, null = у
+  // категории нет своей маржи (действует глобальная из настроек).
+  const categoryMarginPercent = dbCategory?.target_margin_percent != null
+    ? Number(dbCategory.target_margin_percent)
+    : null;
+
   const purchasePriceNum = form.purchasePrice !== '' && form.purchasePrice != null ? Number(form.purchasePrice) : null;
-  const pricingResult = purchasePriceNum != null && pricingSettings
-    ? calcPricing({ purchasePrice: purchasePriceNum, settings: pricingSettings })
+  // При закупке за кг без заполненного веса effectiveCost = null — блок
+  // расчёта показывает просьбу указать вес, а не считает по цене за кг.
+  const effectiveCost = effectivePurchaseCost({
+    purchasePrice: form.purchasePrice,
+    pricingUnit: form.pricingUnit,
+    weightKg: form.weightKg,
+  });
+  const pricingResult = effectiveCost != null && pricingSettings
+    ? calcPricing({ purchasePrice: effectiveCost, settings: pricingSettings, categoryMarginPercent })
     : null;
   const pricingIndicatorColor = pricingResult && !pricingResult.error
     ? pricingStatus(Number(form.price) || 0, pricingResult)
@@ -132,7 +158,15 @@ export default function ProductForm() {
     api
       .getProduct(id)
       .then((p) => {
-        setForm({ ...EMPTY_PRODUCT, ...p, badge: p.badge || null, isBundle: p.isBundle || false, purchasePrice: p.purchasePrice ?? '' });
+        setForm({
+          ...EMPTY_PRODUCT,
+          ...p,
+          badge: p.badge || null,
+          isBundle: p.isBundle || false,
+          purchasePrice: p.purchasePrice ?? '',
+          pricingUnit: p.pricingUnit || 'piece',
+          weightKg: p.weightKg ?? '',
+        });
         setBundleComposition(p.bundleComposition || []);
         setNutrition(
           p.nutrition
@@ -317,6 +351,8 @@ export default function ProductForm() {
       ...form,
       price: Number(form.price) || 0,
       purchasePrice: form.purchasePrice !== '' && form.purchasePrice != null ? Number(form.purchasePrice) : null,
+      pricingUnit: form.pricingUnit === 'kg' ? 'kg' : 'piece',
+      weightKg: form.pricingUnit === 'kg' && form.weightKg !== '' ? Number(form.weightKg) : null,
       sortOrder: Number(form.sortOrder) || 0,
       badge: form.badge && form.badge.type ? form.badge : null,
       composition: form.composition.filter((row) => row[0] || row[1]),
@@ -433,7 +469,26 @@ export default function ProductForm() {
             </div>
 
             <div className="field">
-              <label htmlFor="purchasePrice">Закупочная цена, ₽</label>
+              <label htmlFor="pricingUnit">Закупка указана</label>
+              <select
+                id="pricingUnit"
+                value={form.pricingUnit}
+                onChange={(e) => updateField('pricingUnit', e.target.value)}
+              >
+                <option value="piece">За штуку / упаковку</option>
+                <option value="kg">За килограмм</option>
+              </select>
+              <div className="hint">
+                «За килограмм» — закупочная цена вводится за кг, стоимость упаковки
+                считается через вес для расчёта ниже. Текстовое поле «Вес / описание
+                объёма» на это не влияет — оно только для покупателя.
+              </div>
+            </div>
+
+            <div className="field">
+              <label htmlFor="purchasePrice">
+                {form.pricingUnit === 'kg' ? 'Закупочная цена за кг, ₽' : 'Закупочная цена, ₽'}
+              </label>
               <input
                 id="purchasePrice"
                 type="number"
@@ -444,16 +499,42 @@ export default function ProductForm() {
                 placeholder="например, 120"
               />
               <div className="hint">
-                Сколько вы платите поставщику за единицу. Необязательно — пока
-                пусто, расчёт рекомендуемой цены ниже просто не показывается.
+                {form.pricingUnit === 'kg'
+                  ? 'Сколько вы платите поставщику за килограмм. Необязательно — пока пусто, расчёт рекомендуемой цены ниже просто не показывается.'
+                  : 'Сколько вы платите поставщику за единицу. Необязательно — пока пусто, расчёт рекомендуемой цены ниже просто не показывается.'}
               </div>
             </div>
+
+            {form.pricingUnit === 'kg' && (
+              <div className="field">
+                <label htmlFor="weightKg">Вес для расчёта, кг</label>
+                <input
+                  id="weightKg"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={form.weightKg ?? ''}
+                  onChange={(e) => updateField('weightKg', e.target.value)}
+                  placeholder="например, 0.7"
+                />
+                <div className="hint">
+                  {effectiveCost != null && purchasePriceNum != null
+                    ? `Закупка упаковки: ${purchasePriceNum.toLocaleString('ru-RU')} ₽/кг × ${Number(form.weightKg).toLocaleString('ru-RU')} кг = ${fmtRub(effectiveCost)} ₽`
+                    : 'Фактический вес упаковки/порции в килограммах — только для расчёта закупки, покупатель его не видит.'}
+                </div>
+              </div>
+            )}
 
             {purchasePriceNum != null && (
               <div className="field full">
                 {pricingSettingsError ? (
                   <div className="hint" style={{ color: 'var(--danger)' }}>
                     Не удалось загрузить настройки ценообразования: {pricingSettingsError}
+                  </div>
+                ) : effectiveCost == null ? (
+                  <div className="hint" style={{ color: 'var(--danger)' }}>
+                    Закупка указана за килограмм — укажите «Вес для расчёта, кг», чтобы посчитать
+                    стоимость упаковки и рекомендации по цене.
                   </div>
                 ) : !pricingSettings ? (
                   <div className="hint">Загрузка настроек ценообразования…</div>
@@ -465,19 +546,52 @@ export default function ProductForm() {
                       display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
                       gap: '6px 20px', fontSize: 13, color: 'var(--ink)', marginBottom: 16,
                     }}>
+                      {form.pricingUnit === 'kg' && (
+                        <div>Закупка упаковки: <b>{fmtRub(effectiveCost)} ₽</b></div>
+                      )}
                       <div>Себестоимость единицы: <b>{fmtRub(pricingResult.unitCost)} ₽</b></div>
                       <div>Доля постоянных расходов: <b>{fmtRub(pricingResult.fixedShare)} ₽</b></div>
-                      <div>Цена безубыточности: <b>{fmtRub(pricingResult.breakEvenPrice)} ₽</b></div>
+                      <div>
+                        Целевая маржа: <b>{pricingResult.marginPercent.toLocaleString('ru-RU')}%</b>{' '}
+                        <span style={{ color: 'var(--ink-soft)' }}>
+                          {pricingResult.marginSource === 'category'
+                            ? `(категория${dbCategory?.label ? ` «${dbCategory.label}»` : ''})`
+                            : '(глобальная настройка)'}
+                        </span>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                    {/* Диапазон цен: безубыток → рекомендуемая → премиальная
+                        (маржа ×1.5 в том же расчёте, см. pricingCalc.js). */}
+                    <div style={{
+                      display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                      gap: 12, marginBottom: 12,
+                    }}>
                       <div>
                         <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--ink-soft)', fontWeight: 800 }}>
-                          Рекомендуемая цена
+                          Минимальная (безубыток)
+                        </div>
+                        <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--ink)' }}>
+                          {fmtRub(pricingResult.breakEvenPrice)} ₽
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--ink-soft)', fontWeight: 800 }}>
+                          Рекомендуемая
                         </div>
                         <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--accent)' }}>
                           {fmtRub(pricingResult.recommendedPrice)} ₽
                         </div>
                       </div>
+                      <div>
+                        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--ink-soft)', fontWeight: 800 }}>
+                          Премиальная (маржа ×1.5)
+                        </div>
+                        <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--ink)' }}>
+                          {pricingResult.premiumPrice != null ? `${fmtRub(pricingResult.premiumPrice)} ₽` : '—'}
+                        </div>
+                      </div>
+                    </div>
+                    <div>
                       <button
                         type="button"
                         className="btn-secondary"

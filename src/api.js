@@ -102,6 +102,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  // data: { targetMarginPercent: number | null } — null сбрасывает маржу
+  // категории на глобальную из настроек ценообразования.
+  updateCategory: (id, data) =>
+    request(`/api/admin/categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
   deleteCategory: (id) =>
     request(`/api/admin/categories/${id}`, {
       method: 'DELETE',

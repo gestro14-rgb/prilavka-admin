@@ -19,7 +19,26 @@
 //
 // "Маржа" здесь — наценка на себестоимость (cost-plus), а не % от выручки.
 
-export function calcPricing({ purchasePrice, settings }) {
+// Эффективная закупочная стоимость единицы (упаковки) товара.
+// pricing_unit = 'kg' — закупка введена за килограмм, умножаем на вес
+// упаковки weight_kg (структурированное поле из migrations/036; текстовое
+// products.weight НЕ парсим — там свободный текст вида "1 пучок"). Вес не
+// задан или невалиден → null: расчёт невозможен, форма просит заполнить вес.
+// pricing_unit = 'piece' (и любое другое значение) — закупка как есть.
+export function effectivePurchaseCost({ purchasePrice, pricingUnit, weightKg }) {
+  if (purchasePrice == null || purchasePrice === '') return null;
+  if (pricingUnit === 'kg') {
+    const w = Number(weightKg);
+    if (!Number.isFinite(w) || w <= 0) return null;
+    return Number(purchasePrice) * w;
+  }
+  return Number(purchasePrice);
+}
+
+// categoryMarginPercent — целевая маржа категории товара (migrations/037).
+// Двухуровневый приоритет: маржа категории, если задана, иначе глобальная
+// defaultMarginPercent из настроек. Уровня "маржа товара" сознательно нет.
+export function calcPricing({ purchasePrice, settings, categoryMarginPercent }) {
   const fixedCostsMonthly = Number(settings?.fixedCostsMonthly) || 0;
   const plannedSalesMonthly = Number(settings?.plannedSalesMonthly) || 0;
   const packagingCostPerUnit = Number(settings?.packagingCostPerUnit) || 0;
@@ -46,7 +65,8 @@ export function calcPricing({ purchasePrice, settings }) {
   }
 
   const a = acquiringPercent / 100;
-  const m = defaultMarginPercent / 100;
+  const marginPercent = categoryMarginPercent != null ? Number(categoryMarginPercent) : defaultMarginPercent;
+  const m = marginPercent / 100;
   // Постоянные расходы делятся дважды: сначала на число заказов (доля на
   // заказ), потом на среднее число позиций внутри заказа (доля на товар) —
   // раньше второго деления не было, и вся доля на заказ ошибочно приписывалась
@@ -71,7 +91,26 @@ export function calcPricing({ purchasePrice, settings }) {
   // Себестоимость единицы — уже с поправкой на списания (wasteAdjustedGoodsCost).
   const unitCost = wasteAdjustedGoodsCost + acquiringCostAtRecommended;
 
-  return { fixedShare, unitCost, breakEvenPrice, recommendedPrice };
+  // Премиальная цена — тот же расчёт, что recommendedPrice, но с целевой
+  // маржой ×1.5 (25% → 37.5%). При высокой марже её знаменатель может уйти
+  // в ноль/минус раньше, чем у рекомендуемой — тогда premiumPrice = null
+  // (UI показывает "—"), а не ошибка на весь блок.
+  const mPremium = m * 1.5;
+  const denominatorPremium = 1 - wasteAdjustedAcquiring * (1 + mPremium);
+  const premiumPrice = denominatorPremium > 0
+    ? (costBeforeAcquiring * (1 + mPremium)) / denominatorPremium
+    : null;
+
+  return {
+    fixedShare,
+    unitCost,
+    breakEvenPrice,
+    recommendedPrice,
+    premiumPrice,
+    // Какая маржа реально применена и откуда — для подписи в UI.
+    marginPercent,
+    marginSource: categoryMarginPercent != null ? 'category' : 'global',
+  };
 }
 
 // green — текущая цена ≥ рекомендуемой (хорошая маржа)
