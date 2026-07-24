@@ -52,6 +52,20 @@ const PRICING_STATUS_VERDICT = {
 
 const fmtRub = (n) => Math.round(n).toLocaleString('ru-RU');
 
+// У части старых товаров pricing когда-то хранился как массив строк-подписей
+// (до перехода на объектную схему {label,sub,pct,amount,color}). Открытие
+// такого товара и правка любого поля в updatePricingItem спредили строку
+// поэлементно ({...'Поставщику'} → {0:'П',1:'о',...}) — отсюда битые записи
+// с ключами "0","1","2". Отфильтровываем такие элементы при загрузке формы,
+// а не пытаемся угадать исходный текст — он необратимо потерян.
+function normalizePricing(pricing) {
+  if (!Array.isArray(pricing)) return [];
+  return pricing.filter(
+    (p) => p && typeof p === 'object' && !Array.isArray(p)
+      && typeof p.label === 'string' && p.label.trim() !== ''
+  );
+}
+
 const BADGE_TYPES = [
   { value: '', label: 'Без метки' },
   { value: 'popular', label: 'Чаще берут' },
@@ -167,6 +181,7 @@ export default function ProductForm() {
           pricingUnit: p.pricingUnit || 'piece',
           weightKg: p.weightKg ?? '',
           individualMarginPercent: p.individualMarginPercent ?? '',
+          pricing: normalizePricing(p.pricing),
         });
         setBundleComposition(p.bundleComposition || []);
         setNutrition(
@@ -231,10 +246,17 @@ export default function ProductForm() {
     setForm((prev) => ({ ...prev, suppliers: prev.suppliers.filter((_, i) => i !== index) }));
 
   // ===== Ценовая разбивка =====
+  // Спред не-объекта (см. normalizePricing выше) — источник бага порчи
+  // данных, поэтому pricing[index] подстраховываем базовым объектом, если
+  // он вдруг оказался не {label,sub,pct,amount,color}.
   const updatePricingItem = (index, field, value) =>
     setForm((prev) => {
       const pricing = [...prev.pricing];
-      pricing[index] = { ...pricing[index], [field]: value };
+      const current = pricing[index];
+      const base = current && typeof current === 'object' && !Array.isArray(current)
+        ? current
+        : { label: '', sub: '', pct: 0, amount: 0, color: '#5C8A52' };
+      pricing[index] = { ...base, [field]: value };
       return { ...prev, pricing };
     });
   const addPricingItem = () =>
