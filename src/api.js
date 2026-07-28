@@ -255,6 +255,15 @@ export const api = {
       body: JSON.stringify({ value }),
     }),
 
+  // /api/ui-icons публичный (его же читает prilavka-app), запись — только
+  // через /api/admin/ui-icons/:key.
+  getUiIcons: () => request('/api/ui-icons'),
+  updateUiIcon: (key, imageUrl) =>
+    request(`/api/admin/ui-icons/${key}`, {
+      method: 'PUT',
+      body: JSON.stringify({ imageUrl }),
+    }),
+
   getPricingSettings: () => request('/api/admin/pricing-settings'),
   updatePricingSettings: (data) =>
     request('/api/admin/pricing-settings', {

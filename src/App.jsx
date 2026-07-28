@@ -20,6 +20,7 @@ import HomeContent from './HomeContent';
 import Settings from './Settings';
 import Pricing from './Pricing';
 import PriceAnalytics from './PriceAnalytics';
+import UiIcons from './UiIcons';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -67,6 +68,7 @@ export default function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="pricing" element={<Pricing />} />
         <Route path="price-analytics" element={<PriceAnalytics />} />
+        <Route path="ui-icons" element={<UiIcons />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
