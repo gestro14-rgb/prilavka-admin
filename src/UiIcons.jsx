@@ -4,8 +4,8 @@ import ImageUploadField from './ImageUploadField';
 
 // Список известных ключей — жёстко задан здесь, а не в БД: набор мест
 // интерфейса, которые можно так переопределить, меняется только вместе с
-// кодом (см. миграции 039_ui_icons.sql / 040_ui_icons_more.sql и
-// SectionIcon.jsx в prilavka-app).
+// кодом (см. миграции 039_ui_icons.sql / 040_ui_icons_more.sql /
+// 041_ui_icons_order_status.sql и SectionIcon.jsx в prilavka-app).
 // fallbackLabel — что видит пользователь, если картинка не загружена: для
 // большинства это буквально эмодзи, а для "Адрес доставки"/"Мои заказы"
 // (линейная SVG-иконка IconPin/IconBag) и "Индикатор адреса на Главной"
@@ -26,6 +26,8 @@ const KNOWN_ICONS = [
   { key: 'about_row_packaging', label: 'О «Прилавке»: «Упаковка»', fallbackLabel: '📦' },
   { key: 'about_row_payment', label: 'О «Прилавке»: «Оплата»', fallbackLabel: '💳' },
   { key: 'about_row_telegram_contact', label: 'О «Прилавке» → Контакты: «Написать в Telegram»', fallbackLabel: '✈️' },
+  { key: 'profile_order_status_delivered', label: 'Мои заказы: иконка статуса «Доставлен»', fallbackLabel: 'сейчас: линейная иконка (не эмодзи)' },
+  { key: 'profile_order_status_active', label: 'Мои заказы: иконка активного статуса', fallbackLabel: 'сейчас: линейная иконка (не эмодзи)' },
 ];
 
 export default function UiIcons() {
