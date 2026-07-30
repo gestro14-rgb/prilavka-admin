@@ -305,9 +305,11 @@ export default function ProductForm() {
       // производить дробные значения вообще.
       const clamped = Math.max(0, Math.min(100, Math.round(Number(pricing[index]?.pct) || 0)));
       const otherIndices = pricing.map((_, i) => i).filter((i) => i !== index);
+      const price = Number(prev.price) || 0;
+      const amountFor = (pct) => (price > 0 ? Math.round(price * pct / 100) : 0);
 
       const next = [...pricing];
-      next[index] = { ...next[index], pct: clamped };
+      next[index] = { ...next[index], pct: clamped, amount: amountFor(clamped) };
 
       if (otherIndices.length === 0) {
         return { ...prev, pricing: next };
@@ -328,7 +330,7 @@ export default function ProductForm() {
       newOtherValues[newOtherValues.length - 1] += drift;
 
       otherIndices.forEach((i, idx) => {
-        next[i] = { ...next[i], pct: newOtherValues[idx] };
+        next[i] = { ...next[i], pct: newOtherValues[idx], amount: amountFor(newOtherValues[idx]) };
       });
       return { ...prev, pricing: next };
     });
