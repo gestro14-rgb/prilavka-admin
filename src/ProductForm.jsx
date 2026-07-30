@@ -4,6 +4,17 @@ import { api } from './api';
 import ImageUploadField from './ImageUploadField';
 import { calcPricing, pricingStatus, calcCurrentPriceMargin, effectivePurchaseCost } from './pricingCalc';
 
+// Стандартная разбивка "Из чего складывается цена" — те же 5 строк, что
+// зашиты в prilavka-agent/agent.js (buildPricing) для карточки товара в
+// боте; цвета взяты оттуда же, чтобы не расходились между приложениями.
+const STANDARD_PRICING_TEMPLATE = [
+  { label: 'Фермерам', sub: 'закупка напрямую у производителей', pct: 33, color: '#2A7A2A' },
+  { label: 'Логистика', sub: 'доставка и хранение', pct: 25, color: '#E0A458' },
+  { label: 'Упаковка', sub: 'бережная упаковка без пластика', pct: 12, color: '#8B6F47' },
+  { label: 'Контроль качества', sub: 'отбор и проверка свежести', pct: 15, color: '#6B92B8' },
+  { label: 'Сервис', sub: 'работа платформы и эквайринг', pct: 15, color: '#C4782A' },
+];
+
 const EMPTY_PRODUCT = {
   id: '',
   slug: '',
@@ -266,6 +277,19 @@ export default function ProductForm() {
     }));
   const removePricingItem = (index) =>
     setForm((prev) => ({ ...prev, pricing: prev.pricing.filter((_, i) => i !== index) }));
+  // amount считаем от уже введённой цены, если она есть — иначе 0, админ
+  // подставит цену позже и суммы можно будет пересчитать вручную.
+  const fillStandardPricingTemplate = () =>
+    setForm((prev) => {
+      const price = Number(prev.price) || 0;
+      return {
+        ...prev,
+        pricing: STANDARD_PRICING_TEMPLATE.map((row) => ({
+          ...row,
+          amount: price > 0 ? Math.round(price * row.pct / 100) : 0,
+        })),
+      };
+    });
 
   // На blur процента (после того как ввод закончен, не на каждое нажатие
   // клавиши — иначе стирание значения перед вводом нового мигало бы
@@ -1035,6 +1059,11 @@ export default function ProductForm() {
 
           <div className="section-label">Из чего складывается цена</div>
           <div className="repeat-list">
+            {form.pricing.length === 0 && (
+              <button type="button" className="add-row-btn" onClick={fillStandardPricingTemplate}>
+                Заполнить стандартным шаблоном
+              </button>
+            )}
             {form.pricing.map((p, i) => (
               <div className="repeat-row" key={i}>
                 <div className="field">
