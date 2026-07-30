@@ -300,7 +300,10 @@ export default function ProductForm() {
   const redistributePricingPct = (index) =>
     setForm((prev) => {
       const pricing = prev.pricing;
-      const clamped = Math.max(0, Math.min(100, Number(pricing[index]?.pct) || 0));
+      // Целые проценты, не дробные — браузер продолжал ругаться на step
+      // даже после step="0.1" на инпуте (см. коммит), надёжнее просто не
+      // производить дробные значения вообще.
+      const clamped = Math.max(0, Math.min(100, Math.round(Number(pricing[index]?.pct) || 0)));
       const otherIndices = pricing.map((_, i) => i).filter((i) => i !== index);
 
       const next = [...pricing];
@@ -310,19 +313,19 @@ export default function ProductForm() {
         return { ...prev, pricing: next };
       }
 
-      const remainder = Math.round((100 - clamped) * 10) / 10;
+      const remainder = 100 - clamped;
       const oldOtherValues = otherIndices.map((i) => Number(pricing[i]?.pct) || 0);
       const oldOtherSum = oldOtherValues.reduce((a, b) => a + b, 0);
 
       const newOtherValues = oldOtherSum > 0
-        ? oldOtherValues.map((v) => Math.round((v * remainder / oldOtherSum) * 10) / 10)
-        : otherIndices.map(() => Math.round((remainder / otherIndices.length) * 10) / 10);
+        ? oldOtherValues.map((v) => Math.round(v * remainder / oldOtherSum))
+        : otherIndices.map(() => Math.round(remainder / otherIndices.length));
 
       // Округление каждой строки по отдельности может увести сумму от
-      // остатка на десятые — компенсируем разницу последней строкой, чтобы
+      // остатка на единицы — компенсируем разницу последней строкой, чтобы
       // сумма всех строк (включая изменённую) была равна 100 точно.
-      const drift = Math.round((remainder - newOtherValues.reduce((a, b) => a + b, 0)) * 10) / 10;
-      newOtherValues[newOtherValues.length - 1] = Math.round((newOtherValues[newOtherValues.length - 1] + drift) * 10) / 10;
+      const drift = remainder - newOtherValues.reduce((a, b) => a + b, 0);
+      newOtherValues[newOtherValues.length - 1] += drift;
 
       otherIndices.forEach((i, idx) => {
         next[i] = { ...next[i], pct: newOtherValues[idx] };
