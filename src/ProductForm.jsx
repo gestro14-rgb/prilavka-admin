@@ -267,6 +267,45 @@ export default function ProductForm() {
   const removePricingItem = (index) =>
     setForm((prev) => ({ ...prev, pricing: prev.pricing.filter((_, i) => i !== index) }));
 
+  // На blur процента (после того как ввод закончен, не на каждое нажатие
+  // клавиши — иначе стирание значения перед вводом нового мигало бы
+  // промежуточным перераспределением у остальных строк) пропорционально
+  // подстраиваем остальные строки, чтобы сумма процентов снова была 100,
+  // сохраняя их взаимное соотношение. Если остальные в сумме дают 0 —
+  // делить пропорционально нечего, делим остаток поровну.
+  const redistributePricingPct = (index) =>
+    setForm((prev) => {
+      const pricing = prev.pricing;
+      const clamped = Math.max(0, Math.min(100, Number(pricing[index]?.pct) || 0));
+      const otherIndices = pricing.map((_, i) => i).filter((i) => i !== index);
+
+      const next = [...pricing];
+      next[index] = { ...next[index], pct: clamped };
+
+      if (otherIndices.length === 0) {
+        return { ...prev, pricing: next };
+      }
+
+      const remainder = Math.round((100 - clamped) * 10) / 10;
+      const oldOtherValues = otherIndices.map((i) => Number(pricing[i]?.pct) || 0);
+      const oldOtherSum = oldOtherValues.reduce((a, b) => a + b, 0);
+
+      const newOtherValues = oldOtherSum > 0
+        ? oldOtherValues.map((v) => Math.round((v * remainder / oldOtherSum) * 10) / 10)
+        : otherIndices.map(() => Math.round((remainder / otherIndices.length) * 10) / 10);
+
+      // Округление каждой строки по отдельности может увести сумму от
+      // остатка на десятые — компенсируем разницу последней строкой, чтобы
+      // сумма всех строк (включая изменённую) была равна 100 точно.
+      const drift = Math.round((remainder - newOtherValues.reduce((a, b) => a + b, 0)) * 10) / 10;
+      newOtherValues[newOtherValues.length - 1] = Math.round((newOtherValues[newOtherValues.length - 1] + drift) * 10) / 10;
+
+      otherIndices.forEach((i, idx) => {
+        next[i] = { ...next[i], pct: newOtherValues[idx] };
+      });
+      return { ...prev, pricing: next };
+    });
+
   // ===== Кастомизируемый состав набора =====
   const startEditBundleItem = (item) => {
     setEditingItem({ ...item, alternatives: item.alternatives ? [...item.alternatives] : [] });
@@ -1024,6 +1063,7 @@ export default function ProductForm() {
                     max="100"
                     value={p.pct}
                     onChange={(e) => updatePricingItem(i, 'pct', e.target.value)}
+                    onBlur={() => redistributePricingPct(i)}
                   />
                 </div>
                 <div className="field" style={{ flex: '0 0 100px' }}>
