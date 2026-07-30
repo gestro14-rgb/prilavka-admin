@@ -1090,6 +1090,7 @@ export default function ProductForm() {
                     type="number"
                     min="0"
                     max="100"
+                    step="0.1"
                     value={p.pct}
                     onChange={(e) => updatePricingItem(i, 'pct', e.target.value)}
                     onBlur={() => redistributePricingPct(i)}
