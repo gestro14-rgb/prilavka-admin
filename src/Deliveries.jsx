@@ -135,7 +135,7 @@ export default function Deliveries() {
                 type="text"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="например, Митино · вчера"
+                placeholder="например, Митино (дата добавляется автоматически)"
               />
             </div>
             <div className="field full">

@@ -27,6 +27,9 @@ const EMPTY_PRODUCT = {
   slug: '',
   title: '',
   price: 0,
+  // Nullable — '' в форме, null на бэкенде (как purchasePrice ниже): нет
+  // скидки, значит нечего и зачёркивать (см. PriceTag.jsx в prilavka-app).
+  oldPrice: '',
   weight: '',
   emoji: '🥕',
   bg: 'linear-gradient(135deg, #F4F7F2, #fff)',
@@ -196,6 +199,7 @@ export default function ProductForm() {
           badge: p.badge || null,
           isBundle: p.isBundle || false,
           purchasePrice: p.purchasePrice ?? '',
+          oldPrice: p.oldPrice ?? '',
           pricingUnit: p.pricingUnit || 'piece',
           weightKg: p.weightKg ?? '',
           individualMarginPercent: p.individualMarginPercent ?? '',
@@ -463,6 +467,7 @@ export default function ProductForm() {
     const payload = {
       ...form,
       price: Number(form.price) || 0,
+      oldPrice: form.oldPrice !== '' && form.oldPrice != null ? Number(form.oldPrice) : null,
       purchasePrice: form.purchasePrice !== '' && form.purchasePrice != null ? Number(form.purchasePrice) : null,
       pricingUnit: form.pricingUnit === 'kg' ? 'kg' : 'piece',
       weightKg: form.pricingUnit === 'kg' && form.weightKg !== '' ? Number(form.weightKg) : null,
@@ -581,6 +586,21 @@ export default function ProductForm() {
                   ⚠ Цена ниже себестоимости — вы продаёте в убыток!
                 </div>
               )}
+            </div>
+
+            <div className="field">
+              <label htmlFor="oldPrice">Старая цена (для зачёркивания)</label>
+              <input
+                id="oldPrice"
+                type="number"
+                min="0"
+                value={form.oldPrice}
+                onChange={(e) => updateField('oldPrice', e.target.value)}
+                placeholder="не заполнено — скидка не показывается"
+              />
+              <div className="hint">
+                Показывается зачёркнутой рядом с обычной ценой, только если больше текущей.
+              </div>
             </div>
 
             <div className="field">
