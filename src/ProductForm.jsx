@@ -4,6 +4,13 @@ import { api } from './api';
 import ImageUploadField from './ImageUploadField';
 import { calcPricing, pricingStatus, calcCurrentPriceMargin, effectivePurchaseCost } from './pricingCalc';
 
+// Округление сумм в "Из чего складывается цена": обычный Math.round округляет
+// ровно .5 вверх (49.5 → 50), а здесь на этой границе нужно вниз (49.5 → 49).
+// Во всём остальном (не-.5 случаи) ведёт себя как обычное округление.
+function roundHalfDown(value) {
+  return Math.ceil(value - 0.5);
+}
+
 // Стандартная разбивка "Из чего складывается цена" — те же 5 строк, что
 // зашиты в prilavka-agent/agent.js (buildPricing) для карточки товара в
 // боте; цвета взяты оттуда же, чтобы не расходились между приложениями.
@@ -286,7 +293,7 @@ export default function ProductForm() {
         ...prev,
         pricing: STANDARD_PRICING_TEMPLATE.map((row) => ({
           ...row,
-          amount: price > 0 ? Math.round(price * row.pct / 100) : 0,
+          amount: price > 0 ? roundHalfDown(price * row.pct / 100) : 0,
         })),
       };
     });
@@ -297,6 +304,21 @@ export default function ProductForm() {
   // подстраиваем остальные строки, чтобы сумма процентов снова была 100,
   // сохраняя их взаимное соотношение. Если остальные в сумме дают 0 —
   // делить пропорционально нечего, делим остаток поровну.
+  // При уходе с поля цены пересчитываем amount всех строк pricing под новую
+  // цену по их текущим процентам — сами проценты не трогаем, только суммы.
+  const recalcPricingAmounts = () =>
+    setForm((prev) => {
+      if (prev.pricing.length === 0) return prev;
+      const price = Number(prev.price) || 0;
+      return {
+        ...prev,
+        pricing: prev.pricing.map((p) => ({
+          ...p,
+          amount: price > 0 ? roundHalfDown(price * (Number(p.pct) || 0) / 100) : 0,
+        })),
+      };
+    });
+
   const redistributePricingPct = (index) =>
     setForm((prev) => {
       const pricing = prev.pricing;
@@ -306,7 +328,7 @@ export default function ProductForm() {
       const clamped = Math.max(0, Math.min(100, Math.round(Number(pricing[index]?.pct) || 0)));
       const otherIndices = pricing.map((_, i) => i).filter((i) => i !== index);
       const price = Number(prev.price) || 0;
-      const amountFor = (pct) => (price > 0 ? Math.round(price * pct / 100) : 0);
+      const amountFor = (pct) => (price > 0 ? roundHalfDown(price * pct / 100) : 0);
 
       const next = [...pricing];
       next[index] = { ...next[index], pct: clamped, amount: amountFor(clamped) };
@@ -539,6 +561,7 @@ export default function ProductForm() {
                   min="0"
                   value={form.price}
                   onChange={(e) => updateField('price', e.target.value)}
+                  onBlur={recalcPricingAmounts}
                   required
                   style={pricingIndicatorColor ? { paddingRight: 34 } : undefined}
                 />
