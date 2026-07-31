@@ -34,37 +34,95 @@ function screenLabel(name) {
   return SCREEN_LABELS[name] || name;
 }
 
+// Оттенки ступеней — от насыщенного к светлому по мере сужения воронки.
+// Захардкожены, а не color-mix(): шагов ровно шесть и они не меняются.
+const FUNNEL_SHADES = ['#1C8F1C', '#28992A', '#35A338', '#43AD46', '#52B755', '#61C164'];
+
+function pluralSessions(n) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'сессия';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'сессии';
+  return 'сессий';
+}
+
+// Воронка ступенями: ширина блока — доля от ПЕРВОГО шага (а не от максимума,
+// как было раньше), поэтому сужение читается как реальный путь клиента.
+// Между ступенями — перемычка с отвалом в процентах и в людях.
 function FunnelBlock({ funnel, loading }) {
   if (loading) return <div className="loading">Загрузка…</div>;
   if (!funnel || funnel.steps.every((s) => s.count === 0)) {
     return <div className="empty-hint">Нет данных за выбранный период</div>;
   }
-  const maxCount = Math.max(...funnel.steps.map((s) => s.count), 1);
+
+  const steps = funnel.steps;
+  // Обычно база — «Главная». Но если на неё почему-то нет событий (сессия
+  // может начаться сразу с каталога по диплинку), берём максимум, иначе
+  // всё поделилось бы на ноль и воронка схлопнулась бы в нули.
+  const base = steps[0]?.count || Math.max(...steps.map((s) => s.count), 1);
+  const last = steps[steps.length - 1];
+  const totalConversion = base ? Math.round((last.count / base) * 1000) / 10 : 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {funnel.steps.map((s) => {
-        const pct = Math.round((s.count / maxCount) * 100);
+    <div>
+      {steps.map((s, i) => {
+        // Клампим сверху: шаг может превысить базу (сессия с диплинка
+        // начинается сразу с каталога, минуя главную) — без ограничения
+        // блок вылез бы за карточку.
+        const widthPct = Math.min(Math.max((s.count / base) * 100, 22), 100);
+        const fromStart = base ? Math.round((s.count / base) * 1000) / 10 : 0;
+        const lost = i > 0 ? steps[i - 1].count - s.count : 0;
+
         return (
           <div key={s.step}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
-              <span style={{ fontWeight: 700, fontSize: 13 }}>{s.label}</span>
-              <span style={{ fontSize: 13, display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <b style={{ fontSize: 17 }}>{fmt(s.count)}</b>
-                <span style={{ color: 'var(--ink-soft)' }}>сессий</span>
-                {s.dropOffPct != null && (
-                  <span style={{ color: s.dropOffPct > 0 ? '#C0392B' : 'var(--ink-soft)', fontWeight: 800 }}>
-                    {s.dropOffPct > 0 ? `отвал −${s.dropOffPct}%` : '0% отвала'}
-                  </span>
-                )}
+            {i > 0 && (
+              <div
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  gap: 8, padding: '7px 0', fontSize: 12, fontWeight: 700,
+                  color: lost > 0 ? 'var(--danger)' : 'var(--ink-soft)',
+                }}
+              >
+                <span style={{ color: 'var(--line)' }}>▼</span>
+                {lost > 0
+                  ? <span>−{s.dropOffPct}% · потеряли {fmt(lost)} {pluralSessions(lost)}</span>
+                  : <span>без отвала</span>}
+              </div>
+            )}
+
+            <div
+              style={{
+                width: `${widthPct}%`, margin: '0 auto', borderRadius: 10,
+                background: FUNNEL_SHADES[i] || FUNNEL_SHADES[FUNNEL_SHADES.length - 1],
+                color: '#FFFFFF', padding: '12px 16px',
+                display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                gap: 12, minWidth: 240, boxSizing: 'border-box',
+              }}
+            >
+              <span style={{ fontWeight: 800, fontSize: 14 }}>{s.label}</span>
+              <span style={{ display: 'flex', alignItems: 'baseline', gap: 8, whiteSpace: 'nowrap' }}>
+                <b style={{ fontSize: 20 }}>{fmt(s.count)}</b>
+                <span style={{ fontSize: 12, opacity: 0.85 }}>{fromStart}%</span>
               </span>
-            </div>
-            <div style={{ width: '100%', height: 10, background: 'var(--surface)', borderRadius: 6, overflow: 'hidden' }}>
-              <div style={{ width: `${Math.max(pct, 2)}%`, height: '100%', background: 'var(--accent)', borderRadius: 6 }} />
             </div>
           </div>
         );
       })}
+
+      <div
+        style={{
+          marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--line)',
+          display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 10,
+        }}
+      >
+        <span style={{ fontSize: 13, color: 'var(--ink-soft)', fontWeight: 700 }}>
+          {steps[0].label} → {last.label}
+        </span>
+        <b style={{ fontSize: 24, color: 'var(--accent)' }}>{totalConversion}%</b>
+        <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+          ({fmt(last.count)} из {fmt(base)})
+        </span>
+      </div>
     </div>
   );
 }
@@ -207,7 +265,7 @@ export default function Analytics() {
           <thead>
             <tr>
               <th>Начало</th>
-              <th>User ID</th>
+              <th>Пользователь</th>
               <th style={{ textAlign: 'right' }}>Событий</th>
               <th>Дошёл до</th>
               <th></th>
@@ -229,7 +287,11 @@ export default function Analytics() {
                   }}
                 >
                   <td>{new Date(s.startedAt).toLocaleString('ru-RU')}</td>
-                  <td>{s.userId ?? '—'}</td>
+                  {/* Имени нет у входа по телефону и у сессий вне Telegram —
+                      там в analytics_events не пишется user_id вообще.
+                      Показываем сам id как запасной вариант, чтобы сессия
+                      всё равно оставалась опознаваемой. */}
+                  <td>{s.userName || (s.userId != null ? `id ${s.userId}` : '—')}</td>
                   <td style={{ textAlign: 'right' }}>{s.eventCount}</td>
                   <td style={{ fontWeight: 700 }}>{screenLabel(s.finalStep)}</td>
                   <td style={{ color: 'var(--accent)', fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>Путь →</td>
@@ -246,7 +308,9 @@ export default function Analytics() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <div className="section-label" style={{ margin: 0 }}>
               Путь сессии {selectedSession ? selectedSession.sessionId.slice(0, 8) : ''}
-              {selectedSession?.userId ? ` · user ${selectedSession.userId}` : ''}
+              {selectedSession?.userName
+                ? ` · ${selectedSession.userName}`
+                : selectedSession?.userId ? ` · id ${selectedSession.userId}` : ''}
             </div>
             <button type="button" className="btn-secondary" onClick={() => setSelectedSession(null)}>Закрыть</button>
           </div>
