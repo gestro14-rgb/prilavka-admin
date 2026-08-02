@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from './api';
 import ImageUploadField from './ImageUploadField';
@@ -50,10 +50,17 @@ const EMPTY_PRODUCT = {
   purchasePrice: '',
   // 'piece' — закупка как есть за единицу; 'kg' — закупка за килограмм,
   // эффективная закупка упаковки = закупка × weightKg (migrations/036).
-  // weightKg — структурированный вес в кг только для расчёта; текстовое
+  // weightKg — структурированный вес в кг для расчёта закупки И (см.
+  // pricePerKg ниже, migrations/045) для расчёта продажной цены; текстовое
   // weight ("700 г", "1 пучок") остаётся витринным описанием и не парсится.
   pricingUnit: 'piece',
   weightKg: '',
+  // Продажная цена за кг для покупателя (customer-facing, НЕ путать с
+  // purchasePrice выше — та закупочная/себестоимость) — витринный акцент
+  // "39 ₽/кг" на карточке товара. Заполнена вместе с weightKg — price
+  // пересчитывается автоматически (см. эффект ниже), но остаётся обычным
+  // редактируемым полем: это дополнительный способ ввода price, не замена.
+  pricePerKg: '',
   // Индивидуальная маржа товара (%, необязательно) — верхний уровень
   // приоритета маржи: товар → подкатегория → глобальная (migrations/038).
   individualMarginPercent: '',
@@ -202,6 +209,7 @@ export default function ProductForm() {
           oldPrice: p.oldPrice ?? '',
           pricingUnit: p.pricingUnit || 'piece',
           weightKg: p.weightKg ?? '',
+          pricePerKg: p.pricePerKg ?? '',
           individualMarginPercent: p.individualMarginPercent ?? '',
           pricing: normalizePricing(p.pricing),
         });
@@ -223,6 +231,25 @@ export default function ProductForm() {
 
   // ===== Основные поля =====
   const updateField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
+
+  // Автоподстановка price = pricePerKg × weightKg — второй, дополнительный
+  // способ ввода цены (первый — обычное ручное поле "Цена, ₽" ниже). Флаг,
+  // а не просто deps на pricePerKg/weightKg: при открытии формы уже
+  // существующего товара загрузка одним setForm сразу проставляет и
+  // pricePerKg, и weightKg — без флага эффект сработал бы на этой же
+  // загрузке и молча переписал бы price, даже если админ когда-то осознанно
+  // подправил её вручную поверх старой подстановки. Ставится в true только
+  // из onChange полей "Цена за кг"/"Вес для расчёта" ниже — то есть только
+  // на реальный ввод, не на программное заполнение формы.
+  const pricingInputsTouchedRef = useRef(false);
+  useEffect(() => {
+    if (!pricingInputsTouchedRef.current || form.pricingUnit !== 'kg') return;
+    const perKg = Number(form.pricePerKg);
+    const weight = Number(form.weightKg);
+    if (!(perKg > 0) || !(weight > 0)) return;
+    setForm((prev) => ({ ...prev, price: String(Math.round(perKg * weight)) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.pricePerKg, form.weightKg, form.pricingUnit]);
 
   // Смена категории сбрасывает подкатегорию — иначе останется несовместимая
   // пара (подкатегория другой категории, которую пользователь больше не видит).
@@ -471,6 +498,7 @@ export default function ProductForm() {
       purchasePrice: form.purchasePrice !== '' && form.purchasePrice != null ? Number(form.purchasePrice) : null,
       pricingUnit: form.pricingUnit === 'kg' ? 'kg' : 'piece',
       weightKg: form.pricingUnit === 'kg' && form.weightKg !== '' ? Number(form.weightKg) : null,
+      pricePerKg: form.pricingUnit === 'kg' && form.pricePerKg !== '' ? Number(form.pricePerKg) : null,
       individualMarginPercent: form.individualMarginPercent !== '' ? Number(form.individualMarginPercent) : null,
       sortOrder: Number(form.sortOrder) || 0,
       badge: form.badge && form.badge.type ? form.badge : null,
@@ -649,13 +677,39 @@ export default function ProductForm() {
                   min="0"
                   step="any"
                   value={form.weightKg ?? ''}
-                  onChange={(e) => updateField('weightKg', e.target.value)}
+                  onChange={(e) => {
+                    pricingInputsTouchedRef.current = true;
+                    updateField('weightKg', e.target.value);
+                  }}
                   placeholder="например, 0.7"
                 />
                 <div className="hint">
                   {effectiveCost != null && purchasePriceNum != null
                     ? `Закупка упаковки: ${purchasePriceNum.toLocaleString('ru-RU')} ₽/кг × ${Number(form.weightKg).toLocaleString('ru-RU')} кг = ${fmtRub(effectiveCost)} ₽`
-                    : 'Фактический вес упаковки/порции в килограммах — только для расчёта закупки, покупатель его не видит.'}
+                    : 'Фактический вес упаковки/порции в килограммах — не показывается покупателю напрямую. Используется для расчёта закупки, а если заполнено «Цена за кг для покупателя» ниже — то и для автоподстановки продажной цены.'}
+                </div>
+              </div>
+            )}
+
+            {form.pricingUnit === 'kg' && (
+              <div className="field">
+                <label htmlFor="pricePerKg">Цена за кг для покупателя, ₽ (необязательно)</label>
+                <input
+                  id="pricePerKg"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={form.pricePerKg ?? ''}
+                  onChange={(e) => {
+                    pricingInputsTouchedRef.current = true;
+                    updateField('pricePerKg', e.target.value);
+                  }}
+                  placeholder="например, 39"
+                />
+                <div className="hint">
+                  {form.pricePerKg && form.weightKg
+                    ? `На карточке товара покажем крупным акцентом «${Number(form.pricePerKg).toLocaleString('ru-RU')} ₽/кг» вместо обычной цены. Цена товара подставится автоматически: ${Number(form.pricePerKg).toLocaleString('ru-RU')} ₽/кг × ${Number(form.weightKg).toLocaleString('ru-RU')} кг = ${Math.round(Number(form.pricePerKg) * Number(form.weightKg)).toLocaleString('ru-RU')} ₽ — можно поправить вручную ниже.`
+                    : 'Это розничная цена для покупателя (не закупочная!) — витринный акцент вроде «39 ₽/кг», как у арбузов/дынь на Ozon. Заполните вместе с весом выше — цена товара посчитается сама. Пусто — карточка выглядит как обычно.'}
                 </div>
               </div>
             )}
