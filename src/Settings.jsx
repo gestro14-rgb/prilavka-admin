@@ -9,6 +9,7 @@ const SETTING_META = {
   max_points_spend_percent: { label: 'Макс. % суммы заказа для оплаты баллами', unit: '%',   type: 'number' },
   default_slot:             { label: 'Стандартное время доставки',             unit: '',     type: 'text'   },
   review_photo_points:      { label: 'Баллы за отзыв с фото',                  unit: 'балл', type: 'number' },
+  today_cutoff_time:        { label: 'Время отсечки для "Сегодня" (ЧЧ:ММ, МСК)', unit: '',   type: 'text'   },
 };
 
 export default function Settings() {
@@ -51,6 +52,7 @@ export default function Settings() {
     'referral_points_reward',
     'review_photo_points',
     'default_slot',
+    'today_cutoff_time',
   ];
 
   return (
