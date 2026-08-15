@@ -17,6 +17,7 @@ import Districts from './Districts';
 import Subcategories from './Subcategories';
 import Analytics from './Analytics';
 import HomeContent from './HomeContent';
+import StoryCards from './StoryCards';
 import Settings from './Settings';
 import Pricing from './Pricing';
 import PriceAnalytics from './PriceAnalytics';
@@ -65,6 +66,7 @@ export default function App() {
         <Route path="districts" element={<Districts />} />
         <Route path="analytics" element={<Analytics />} />
         <Route path="home-content" element={<HomeContent />} />
+        <Route path="story-cards" element={<StoryCards />} />
         <Route path="settings" element={<Settings />} />
         <Route path="pricing" element={<Pricing />} />
         <Route path="price-analytics" element={<PriceAnalytics />} />

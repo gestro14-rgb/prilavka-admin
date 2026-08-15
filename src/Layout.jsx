@@ -58,6 +58,9 @@ export default function Layout() {
           <NavLink to="/home-content" className={({ isActive }) => (isActive ? 'active' : '')}>
             🏠 Главная страница
           </NavLink>
+          <NavLink to="/story-cards" className={({ isActive }) => (isActive ? 'active' : '')}>
+            🎬 Сторис
+          </NavLink>
           <NavLink to="/settings" className={({ isActive }) => (isActive ? 'active' : '')}>
             ⚙️ Настройки
           </NavLink>

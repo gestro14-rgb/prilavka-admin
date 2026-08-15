@@ -70,6 +70,49 @@ export async function uploadImage(file) {
   return (await res.json()).url;
 }
 
+/**
+ * Загрузка файла сторис (видео/обложка) НАПРЯМУЮ в S3 (Selectel) по
+ * presigned PUT-ссылке — в обход бэкенда, см. POST
+ * /api/admin/story-cards/upload-url. Возвращает постоянный публичный URL,
+ * который потом сохраняется в карточке обычным updateStoryCard.
+ *
+ * XMLHttpRequest, а не fetch: только у XHR есть upload.onprogress —
+ * fetch не умеет отдавать прогресс ОТПРАВКИ, а для видео на десятки
+ * мегабайт индикатор обязателен.
+ *
+ * onProgress получает 0..100 или null, если размер неизвестен.
+ */
+export async function uploadStoryFile(file, kind, onProgress) {
+  const { uploadUrl, publicUrl } = await request('/api/admin/story-cards/upload-url', {
+    method: 'POST',
+    body: JSON.stringify({ kind, contentType: file.type, fileName: file.name }),
+  });
+
+  await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', uploadUrl, true);
+    // Должен совпадать с ContentType, которым подписывали ссылку, иначе
+    // S3 отвергнет запрос по несовпадению подписи.
+    xhr.setRequestHeader('Content-Type', file.type);
+    xhr.upload.onprogress = (e) => {
+      if (typeof onProgress === 'function') {
+        onProgress(e.lengthComputable ? Math.round((e.loaded / e.total) * 100) : null);
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      // Тело ошибки от S3 — XML, не JSON; статуса достаточно, чтобы
+      // отличить истёкшую ссылку (403) от проблем с CORS/сетью (0).
+      else if (xhr.status === 0) reject(new Error('Загрузка заблокирована: проверьте CORS-правило бакета для этого домена'));
+      else reject(new Error(`S3 отклонил загрузку (HTTP ${xhr.status})`));
+    };
+    xhr.onerror = () => reject(new Error('Сеть недоступна или CORS-правило бакета не разрешает этот домен'));
+    xhr.send(file);
+  });
+
+  return publicUrl;
+}
+
 export const api = {
   login: (username, password) =>
     request('/api/admin/login', {
@@ -302,6 +345,24 @@ export const api = {
     }),
   deleteDeliverySchedule: (id) =>
     request(`/api/admin/delivery-schedule/${id}`, { method: 'DELETE' }),
+
+  // Сторис-карточки Главной. Файлы грузятся не здесь, а через
+  // uploadStoryFile выше (напрямую в S3) — сюда попадает только готовый URL.
+  getStoryCards: () => request('/api/admin/story-cards'),
+  createStoryCard: (data) =>
+    request('/api/admin/story-cards', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateStoryCard: (id, data) =>
+    request(`/api/admin/story-cards/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteStoryCard: (id) =>
+    request(`/api/admin/story-cards/${id}`, {
+      method: 'DELETE',
+    }),
 
   getRewards: () => request('/api/admin/rewards'),
   createReward: (data) =>
