@@ -71,10 +71,14 @@ export async function uploadImage(file) {
 }
 
 /**
- * Загрузка файла сторис (видео/обложка) НАПРЯМУЮ в S3 (Selectel) по
- * presigned PUT-ссылке — в обход бэкенда, см. POST
- * /api/admin/story-cards/upload-url. Возвращает постоянный публичный URL,
- * который потом сохраняется в карточке обычным updateStoryCard.
+ * Загрузка файла сторис (видео/обложка) — через наш бэкенд, который
+ * потоком перекладывает файл в S3 и возвращает публичный URL.
+ *
+ * Не напрямую в S3 по presigned-ссылке, хотя такая ручка на бэкенде есть:
+ * Selectel не отдаёт CORS-заголовки на запись и отвечает на preflight
+ * отказом, как только в URL появляются presigned-параметры, поэтому
+ * браузер блокирует PUT ещё до отправки. Проверено на живом бакете, см.
+ * комментарий в prilavka-backend/s3.js.
  *
  * XMLHttpRequest, а не fetch: только у XHR есть upload.onprogress —
  * fetch не умеет отдавать прогресс ОТПРАВКИ, а для видео на десятки
@@ -83,34 +87,32 @@ export async function uploadImage(file) {
  * onProgress получает 0..100 или null, если размер неизвестен.
  */
 export async function uploadStoryFile(file, kind, onProgress) {
-  const { uploadUrl, publicUrl } = await request('/api/admin/story-cards/upload-url', {
-    method: 'POST',
-    body: JSON.stringify({ kind, contentType: file.type, fileName: file.name }),
-  });
+  const form = new FormData();
+  form.append('file', file);
 
-  await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('PUT', uploadUrl, true);
-    // Должен совпадать с ContentType, которым подписывали ссылку, иначе
-    // S3 отвергнет запрос по несовпадению подписи.
-    xhr.setRequestHeader('Content-Type', file.type);
+    xhr.open('POST', `${API_URL}/api/admin/story-cards/upload?kind=${encodeURIComponent(kind)}`, true);
+    xhr.setRequestHeader('Authorization', `Bearer ${getToken()}`);
+    // Content-Type не выставляем вручную: браузер сам добавит его вместе с
+    // boundary для FormData, без которого multipart не разобрать.
     xhr.upload.onprogress = (e) => {
       if (typeof onProgress === 'function') {
         onProgress(e.lengthComputable ? Math.round((e.loaded / e.total) * 100) : null);
       }
     };
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve();
-      // Тело ошибки от S3 — XML, не JSON; статуса достаточно, чтобы
-      // отличить истёкшую ссылку (403) от проблем с CORS/сетью (0).
-      else if (xhr.status === 0) reject(new Error('Загрузка заблокирована: проверьте CORS-правило бакета для этого домена'));
-      else reject(new Error(`S3 отклонил загрузку (HTTP ${xhr.status})`));
+      let body = null;
+      try { body = JSON.parse(xhr.responseText); } catch { /* не JSON — обработаем ниже */ }
+      if (xhr.status >= 200 && xhr.status < 300 && body?.url) {
+        resolve(body.url);
+      } else {
+        reject(new Error(body?.error || `Загрузка не удалась (HTTP ${xhr.status})`));
+      }
     };
-    xhr.onerror = () => reject(new Error('Сеть недоступна или CORS-правило бакета не разрешает этот домен'));
-    xhr.send(file);
+    xhr.onerror = () => reject(new Error('Не удалось связаться с сервером — проверьте соединение'));
+    xhr.send(form);
   });
-
-  return publicUrl;
 }
 
 export const api = {
