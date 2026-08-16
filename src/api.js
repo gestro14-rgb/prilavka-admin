@@ -86,7 +86,19 @@ export async function uploadImage(file) {
  *
  * onProgress получает 0..100 или null, если размер неизвестен.
  */
+// Должно совпадать с STORY_UPLOAD_MAX_BYTES на бэкенде. Проверяем и здесь:
+// сервер, отвергая слишком большой файл, вынужден оборвать приём на
+// середине, и до браузера аккуратный JSON-ответ уже не всегда доходит —
+// пользователь видел бы обрыв связи вместо внятной причины.
+export const STORY_UPLOAD_MAX_MB = 200;
+
 export async function uploadStoryFile(file, kind, onProgress) {
+  if (file.size > STORY_UPLOAD_MAX_MB * 1024 * 1024) {
+    throw new Error(
+      `Файл ${(file.size / 1024 / 1024).toFixed(0)} МБ — больше лимита ${STORY_UPLOAD_MAX_MB} МБ`
+    );
+  }
+
   const form = new FormData();
   form.append('file', file);
 
