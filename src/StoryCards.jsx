@@ -26,6 +26,9 @@ const EMPTY_FORM = {
  */
 function StoryFileUpload({ kind, value, onChange, accept, label }) {
   const [progress, setProgress] = useState(null);
+  // Отдельная фаза после 100%: байты ушли, сервер перекодирует видео под веб
+  // (десятки секунд). Без неё полоса зависала бы на 100% без объяснений.
+  const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef(null);
 
@@ -34,13 +37,15 @@ function StoryFileUpload({ kind, value, onChange, accept, label }) {
     if (!file) return;
     setError('');
     setProgress(0);
+    setProcessing(false);
     try {
-      const url = await uploadStoryFile(file, kind, setProgress);
+      const url = await uploadStoryFile(file, kind, setProgress, () => setProcessing(true));
       onChange(url);
     } catch (err) {
       setError(err.message);
     } finally {
       setProgress(null);
+      setProcessing(false);
       e.target.value = '';
     }
   };
@@ -72,10 +77,15 @@ function StoryFileUpload({ kind, value, onChange, accept, label }) {
           <div style={{ height: 6, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden', maxWidth: 260 }}>
             {/* progress === null уже отсеян выше; здесь null означает
                 "размер неизвестен" — показываем полосу целиком. */}
-            <div style={{ width: `${progress ?? 100}%`, height: '100%', background: '#2563eb', transition: 'width 0.15s' }} />
+            <div style={{
+              width: `${processing ? 100 : (progress ?? 100)}%`, height: '100%',
+              background: processing ? '#f59e0b' : '#2563eb', transition: 'width 0.15s',
+            }} />
           </div>
-          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 3 }}>
-            {progress != null ? `${progress}%` : 'загрузка…'}
+          <div style={{ fontSize: 11, color: processing ? '#b45309' : '#6b7280', marginTop: 3 }}>
+            {processing
+              ? 'Обрабатываем видео, не закрывайте страницу — это займёт до минуты'
+              : progress != null ? `${progress}%` : 'загрузка…'}
           </div>
         </div>
       )}

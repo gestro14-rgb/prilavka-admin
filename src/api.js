@@ -92,7 +92,13 @@ export async function uploadImage(file) {
 // пользователь видел бы обрыв связи вместо внятной причины.
 export const STORY_UPLOAD_MAX_MB = 200;
 
-export async function uploadStoryFile(file, kind, onProgress) {
+// Видео на сервере перекодируется под веб (transcodeStoryVideo в server.js) —
+// это происходит уже ПОСЛЕ того, как файл целиком улетел, то есть после 100%
+// прогресса, и занимает десятки секунд. Даём запас с большим хвостом: явная
+// ошибка по таймауту лучше, чем вечно висящий запрос, если ffmpeg застрял.
+const STORY_UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
+
+export async function uploadStoryFile(file, kind, onProgress, onProcessing) {
   if (file.size > STORY_UPLOAD_MAX_MB * 1024 * 1024) {
     throw new Error(
       `Файл ${(file.size / 1024 / 1024).toFixed(0)} МБ — больше лимита ${STORY_UPLOAD_MAX_MB} МБ`
@@ -106,6 +112,7 @@ export async function uploadStoryFile(file, kind, onProgress) {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${API_URL}/api/admin/story-cards/upload?kind=${encodeURIComponent(kind)}`, true);
     xhr.setRequestHeader('Authorization', `Bearer ${getToken()}`);
+    xhr.timeout = STORY_UPLOAD_TIMEOUT_MS;
     // Content-Type не выставляем вручную: браузер сам добавит его вместе с
     // boundary для FormData, без которого multipart не разобрать.
     xhr.upload.onprogress = (e) => {
@@ -113,6 +120,14 @@ export async function uploadStoryFile(file, kind, onProgress) {
         onProgress(e.lengthComputable ? Math.round((e.loaded / e.total) * 100) : null);
       }
     };
+    // Байты ушли — дальше сервер молча перекодирует. Без этого сигнала
+    // полоса просто застывала бы на 100% без объяснения, что происходит.
+    xhr.upload.onload = () => {
+      if (typeof onProcessing === 'function') onProcessing();
+    };
+    xhr.ontimeout = () => reject(new Error(
+      `Сервер не ответил за ${STORY_UPLOAD_TIMEOUT_MS / 60000} мин — попробуйте ещё раз`
+    ));
     xhr.onload = () => {
       let body = null;
       try { body = JSON.parse(xhr.responseText); } catch { /* не JSON — обработаем ниже */ }
