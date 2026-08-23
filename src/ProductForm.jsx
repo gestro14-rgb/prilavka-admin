@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from './api';
 import ImageUploadField from './ImageUploadField';
+import MediaUploadField from './MediaUploadField';
 import { calcPricing, pricingStatus, calcCurrentPriceMargin, effectivePurchaseCost } from './pricingCalc';
 
 // Округление сумм в "Из чего складывается цена": обычный Math.round округляет
@@ -43,6 +44,7 @@ const EMPTY_PRODUCT = {
   sortOrder: 0,
   imageUrl: '',
   homeImageUrl: '',
+  homeVideoUrl: '',
   isBundle: false,
   subcategoryId: null,
   // Nullable — у уже заведённых товаров пусто, пока их не откроют и не
@@ -904,6 +906,30 @@ export default function ProductForm() {
               />
               <div className="hint" style={{ marginTop: 6 }}>
                 Только для блока «Готовые наборы» на Главной — независимо от фото товара выше. Не загружено — Главная возьмёт обычное фото товара.
+              </div>
+            </div>
+
+            <div className="field full">
+              <label>Видео для Главной (опционально)</label>
+              {form.homeVideoUrl && (
+                <video
+                  src={form.homeVideoUrl}
+                  controls
+                  preload="metadata"
+                  style={{ width: 220, borderRadius: 6, border: '1px solid #e5e7eb', display: 'block', marginBottom: 6 }}
+                />
+              )}
+              <MediaUploadField
+                kind="setVideo"
+                accept="video/*"
+                label="видео"
+                value={form.homeVideoUrl || ''}
+                onChange={(url) => updateField('homeVideoUrl', url)}
+              />
+              <div className="hint" style={{ marginTop: 6 }}>
+                Загруженное видео сразу выводит набор в hero-карусель «Готовые наборы» на Главной — отдельно включать ничего не нужно.
+                Несколько наборов с видео — карусель со свайпом, один — статичная карточка. Звука не будет: видео всегда играет без него.
+                Фото для Главной выше остаётся постером, пока видео грузится.
               </div>
             </div>
 

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { api, uploadStoryFile } from './api';
+import { useEffect, useState } from 'react';
+import { api } from './api';
+import MediaUploadField from './MediaUploadField';
 
 // 7 -> "0:07" — тот же формат, что на карточке в приложении (StoryRow.jsx).
 function formatDuration(totalSeconds) {
@@ -19,80 +20,8 @@ const EMPTY_FORM = {
   isActive: true,
 };
 
-/**
- * Кнопка загрузки файла прямо в S3 (видео или обложка) с индикатором
- * прогресса. Не переиспользует ImageUploadField: тот шлёт файл в
- * Cloudinary через бэкенд-прокси и не умеет ни видео, ни прогресс.
- */
-function StoryFileUpload({ kind, value, onChange, accept, label }) {
-  const [progress, setProgress] = useState(null);
-  // Отдельная фаза после 100%: байты ушли, сервер перекодирует видео под веб
-  // (десятки секунд). Без неё полоса зависала бы на 100% без объяснений.
-  const [processing, setProcessing] = useState(false);
-  const [error, setError] = useState('');
-  const inputRef = useRef(null);
-
-  const handleFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setError('');
-    setProgress(0);
-    setProcessing(false);
-    try {
-      const url = await uploadStoryFile(file, kind, setProgress, () => setProcessing(true));
-      onChange(url);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setProgress(null);
-      setProcessing(false);
-      e.target.value = '';
-    }
-  };
-
-  const uploading = progress !== null;
-
-  return (
-    <div>
-      <input ref={inputRef} type="file" accept={accept} style={{ display: 'none' }} onChange={handleFile} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <button type="button" className="btn-secondary" onClick={() => inputRef.current?.click()} disabled={uploading} style={{ fontSize: 13 }}>
-          {uploading ? 'Загрузка…' : value ? `⬆ Заменить ${label}` : `⬆ Загрузить ${label}`}
-        </button>
-        {value && !uploading && (
-          <>
-            <a href={value} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>открыть</a>
-            <button
-              type="button"
-              onClick={() => onChange('')}
-              style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 13 }}
-            >
-              удалить
-            </button>
-          </>
-        )}
-      </div>
-      {uploading && (
-        <div style={{ marginTop: 6 }}>
-          <div style={{ height: 6, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden', maxWidth: 260 }}>
-            {/* progress === null уже отсеян выше; здесь null означает
-                "размер неизвестен" — показываем полосу целиком. */}
-            <div style={{
-              width: `${processing ? 100 : (progress ?? 100)}%`, height: '100%',
-              background: processing ? '#f59e0b' : '#2563eb', transition: 'width 0.15s',
-            }} />
-          </div>
-          <div style={{ fontSize: 11, color: processing ? '#b45309' : '#6b7280', marginTop: 3 }}>
-            {processing
-              ? 'Обрабатываем видео, не закрывайте страницу — это займёт до минуты'
-              : progress != null ? `${progress}%` : 'загрузка…'}
-          </div>
-        </div>
-      )}
-      {error && <div style={{ fontSize: 12, color: '#dc2626', marginTop: 4 }}>{error}</div>}
-    </div>
-  );
-}
+// Виджет загрузки в S3 переехал в MediaUploadField.jsx — он же используется
+// в ProductForm.jsx для видео набора на Главной.
 
 export default function StoryCards() {
   const [cards, setCards] = useState(null);
@@ -263,7 +192,7 @@ export default function StoryCards() {
                   style={{ width: 90, height: 120, objectFit: 'cover', borderRadius: 6, border: '1px solid #e5e7eb', display: 'block', marginBottom: 6 }}
                 />
               )}
-              <StoryFileUpload
+              <MediaUploadField
                 kind="cover"
                 accept="image/*"
                 label="обложку"
@@ -281,7 +210,7 @@ export default function StoryCards() {
                   style={{ width: 160, borderRadius: 6, border: '1px solid #e5e7eb', display: 'block', marginBottom: 6 }}
                 />
               )}
-              <StoryFileUpload
+              <MediaUploadField
                 kind="video"
                 accept="video/*"
                 label="видео"
