@@ -345,11 +345,19 @@ export const api = {
 
   getStats: () => request('/api/admin/stats'),
 
-  getAnalyticsFunnel: ({ from, to } = {}) => {
+  getAnalyticsFunnel: ({ from, to, utmSource, utmCampaign } = {}) => {
     const params = new URLSearchParams();
     if (from) params.set('from', from);
     if (to) params.set('to', to);
+    if (utmSource) params.set('utm_source', utmSource);
+    if (utmCampaign) params.set('utm_campaign', utmCampaign);
     return request(`/api/admin/analytics/funnel?${params}`);
+  },
+  getAnalyticsSources: ({ from, to } = {}) => {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    return request(`/api/admin/analytics/sources?${params}`);
   },
   getAnalyticsTopScreens: ({ from, to } = {}) => {
     const params = new URLSearchParams();
@@ -357,11 +365,13 @@ export const api = {
     if (to) params.set('to', to);
     return request(`/api/admin/analytics/top-screens?${params}`);
   },
-  getAnalyticsSessions: ({ from, to, userId } = {}) => {
+  getAnalyticsSessions: ({ from, to, userId, utmSource, utmCampaign } = {}) => {
     const params = new URLSearchParams();
     if (from) params.set('from', from);
     if (to) params.set('to', to);
     if (userId) params.set('user_id', userId);
+    if (utmSource) params.set('utm_source', utmSource);
+    if (utmCampaign) params.set('utm_campaign', utmCampaign);
     return request(`/api/admin/analytics/sessions?${params}`);
   },
   getAnalyticsSession: (sessionId) => request(`/api/admin/analytics/sessions/${encodeURIComponent(sessionId)}`),
