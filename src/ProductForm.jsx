@@ -45,6 +45,14 @@ const EMPTY_PRODUCT = {
   imageUrl: '',
   homeImageUrl: '',
   homeVideoUrl: '',
+  // Короткая ситуативная подпись витринной карточки наборов (задача 10
+  // воронки, migrations/051) — "На 1-2 человека" вместо полного title
+  // "Набор семейный на неделю (3-4 чел)". Не замена title/weight: те
+  // используются в чеке заказа и поиске, где нужна точность, не краткость.
+  // Пусто → фронт сам берёт title/weight, как раньше.
+  cardEmoji: '',
+  cardTitle: '',
+  cardSubtitle: '',
   isBundle: false,
   subcategoryId: null,
   // Nullable — у уже заведённых товаров пусто, пока их не откроют и не
@@ -930,6 +938,42 @@ export default function ProductForm() {
                 Загруженное видео сразу выводит набор в hero-карусель «Готовые наборы» на Главной — отдельно включать ничего не нужно.
                 Несколько наборов с видео — карусель со свайпом, один — статичная карточка. Звука не будет: видео всегда играет без него.
                 Фото для Главной выше остаётся постером, пока видео грузится.
+              </div>
+            </div>
+
+            <div className="field">
+              <label htmlFor="cardEmoji">Эмодзи-тег для карточки набора (опционально)</label>
+              <input
+                id="cardEmoji"
+                type="text"
+                value={form.cardEmoji || ''}
+                onChange={(e) => updateField('cardEmoji', e.target.value)}
+                placeholder="🥬"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="cardTitle">Короткое название для карточки (опционально)</label>
+              <input
+                id="cardTitle"
+                type="text"
+                value={form.cardTitle || ''}
+                onChange={(e) => updateField('cardTitle', e.target.value)}
+                placeholder="На 1-2 человека"
+              />
+            </div>
+            <div className="field full">
+              <label htmlFor="cardSubtitle">Короткое пояснение для карточки (опционально)</label>
+              <input
+                id="cardSubtitle"
+                type="text"
+                value={form.cardSubtitle || ''}
+                onChange={(e) => updateField('cardSubtitle', e.target.value)}
+                placeholder="на несколько дней"
+              />
+              <div className="hint" style={{ marginTop: 6 }}>
+                Три поля выше — только для витринных карточек «Готовых наборов» на Главной и в пустой корзине: короткое название по ситуации
+                вместо полного названия товара. Название и вес выше (используются в чеке заказа, поиске каталога) не меняются. Не заполнено —
+                карточка покажет обычные название и вес, как сейчас.
               </div>
             </div>
 
