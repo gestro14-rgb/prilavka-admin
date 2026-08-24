@@ -38,6 +38,10 @@ export default function PromoCodes() {
   const [expiresAt, setExpiresAt] = useState('');
   const [orderCondition, setOrderCondition] = useState('any');
   const [orderConditionN, setOrderConditionN] = useState('');
+  // По умолчанию once_global — как вели себя все коды до миграции 049:
+  // случайно созданный «на всех» код раздал бы скидку неограниченному числу
+  // людей, случайно созданный именной — сгорит после первого применения.
+  const [usageType, setUsageType] = useState('once_global');
 
   const load = () => {
     api
@@ -72,6 +76,7 @@ export default function PromoCodes() {
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
         orderCondition,
         orderConditionN: orderCondition === 'first_n_orders' ? Number(orderConditionN) : null,
+        usageType,
       });
       setSuccess('Промокод создан');
       setCode('');
@@ -80,6 +85,7 @@ export default function PromoCodes() {
       setExpiresAt('');
       setOrderCondition('any');
       setOrderConditionN('');
+      setUsageType('once_global');
       load();
     } catch (e) {
       setError(e.message);
@@ -160,6 +166,18 @@ export default function PromoCodes() {
               />
             </div>
             <div className="field">
+              <label htmlFor="promoUsageType">Кто может применить</label>
+              <select id="promoUsageType" value={usageType} onChange={(e) => setUsageType(e.target.value)}>
+                <option value="once_global">Один человек (сгорает после первого применения)</option>
+                <option value="once_per_user">Все — по разу каждому (код для баннера)</option>
+              </select>
+              <div className="hint">
+                {usageType === 'once_per_user'
+                  ? 'Массовый код: показывается в баннере на Главной. Из нескольких таких в баннер попадает самый свежий.'
+                  : 'Именной код для раздачи конкретному человеку — как ОЛЬГА или АННА.'}
+              </div>
+            </div>
+            <div className="field">
               <label htmlFor="promoOrderCondition">На какой по счёту заказ</label>
               <select
                 id="promoOrderCondition"
@@ -208,6 +226,7 @@ export default function PromoCodes() {
               <th>Скидка</th>
               <th>Мин. сумма</th>
               <th>По счёту</th>
+              <th>Кто применяет</th>
               <th>Статус</th>
               <th>Действует до</th>
               <th>Создан</th>
@@ -220,8 +239,11 @@ export default function PromoCodes() {
                 <td><b>{p.code}</b></td>
                 <td>{p.discountType === 'percent' ? `${p.discountValue}%` : `${p.discountValue.toLocaleString('ru-RU')} ₽`}</td>
                 <td>{p.minOrderTotal ? `${p.minOrderTotal.toLocaleString('ru-RU')} ₽` : '—'}</td>
-                <td>{formatOrderCondition(p)}</td>
-                <td>{p.isUsed ? `Использован ${formatDate(p.usedAt)}` : 'Активен'}</td>
+                <td>{p.usageType === 'once_per_user' ? 'Все, по разу' : 'Один человек'}</td>
+                {/* У массового кода is_used не выставляется вовсе — его
+                    одноразовость живёт в promo_code_uses, поэтому "сгорел"
+                    для него не бывает состоянием. */}
+                <td>{p.usageType !== 'once_per_user' && p.isUsed ? `Использован ${formatDate(p.usedAt)}` : 'Активен'}</td>
                 <td>{p.expiresAt ? formatDate(p.expiresAt) : '—'}</td>
                 <td>{formatDate(p.createdAt)}</td>
                 <td>
