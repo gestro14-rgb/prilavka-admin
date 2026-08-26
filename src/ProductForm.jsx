@@ -53,6 +53,12 @@ const EMPTY_PRODUCT = {
   cardEmoji: '',
   cardTitle: '',
   cardSubtitle: '',
+  // Цветная плашка-тег секции «Сегодня особенно хорошее» на Главной
+  // (migrations/052) — про вкус/текстуру товара, отдельно от «Метки на
+  // карточке» ниже (та про статус: Хит / Выгодно / Чаще берут). Непустой
+  // tagLabel сам заводит товар в секцию, отдельной галочки нет.
+  tagLabel: '',
+  tagColor: '',
   isBundle: false,
   subcategoryId: null,
   // Nullable — у уже заведённых товаров пусто, пока их не откроют и не
@@ -114,6 +120,19 @@ const BADGE_TYPES = [
 // 4 предустановленных акцента дизайн-системы (DESIGN.md §1) — не свободный
 // RGB-пикер, чтобы не размывать палитру. Пусто = цвет по умолчанию для
 // выбранного типа метки (см. HitBadge/EcoBadge/Badge на фронте).
+// Пресеты цвета для плашки-тега «Сегодня особенно хорошее» (migrations/052).
+// Имена, а не hex — сознательно: в badge_color выше за годы налили
+// произвольных оттенков, и фронт в итоге вынужден это поле игнорировать
+// (см. Badge.jsx в мини-аппе). Пару фон/текст под каждое имя разворачивает
+// фронт из палитры, поэтому она остаётся целой при любом содержимом поля.
+const TAG_COLORS = [
+  { value: '',       label: 'Зелёный (по умолчанию)' },
+  { value: 'green',  label: 'Зелёный — свежесть, хруст' },
+  { value: 'orange', label: 'Оранжевый — сочность' },
+  { value: 'ochre',  label: 'Охра — мягкость, мёд' },
+  { value: 'berry',  label: 'Ягодный — сладость' },
+];
+
 const BADGE_COLORS = [
   { value: '', label: 'По умолчанию' },
   { value: '#1C8F1C', label: 'Зелёный' },
@@ -1035,6 +1054,43 @@ export default function ProductForm() {
               <label htmlFor="isBundle">Набор с кастомизируемым составом</label>
               <div className="hint" style={{ marginTop: 4 }}>
                 Если включено, покупатели смогут изменить состав набора при оформлении заказа.
+              </div>
+            </div>
+          </div>
+
+          <div className="section-label">Тег для блока «Сегодня особенно хорошее» (опционально)</div>
+          <div className="form-grid">
+            <div className="field">
+              <label htmlFor="tagLabel">Текст тега</label>
+              <input
+                id="tagLabel"
+                type="text"
+                value={form.tagLabel || ''}
+                onChange={(e) => updateField('tagLabel', e.target.value)}
+                placeholder="например, Сладкая!"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="tagColor">Цвет тега</label>
+              <select
+                id="tagColor"
+                value={form.tagColor || ''}
+                onChange={(e) => updateField('tagColor', e.target.value)}
+                disabled={!form.tagLabel}
+              >
+                {TAG_COLORS.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field full">
+              <div className="hint">
+                Заполненный текст тега сам заводит товар в блок «Сегодня особенно хорошее» на Главной — отдельно включать ничего не нужно.
+                Порядок и точный состав блока можно задать вручную во вкладке «Особенно хорошее» раздела «Главная страница»; пока подборка
+                там пуста, в блок попадают все товары с заполненным тегом. Пишите то, что правда про сам продукт («Сладкая!», «Хрустящие»,
+                «Мягкие»), — это не статус вроде «Хит», для него есть «Метка на карточке» ниже.
               </div>
             </div>
           </div>

@@ -291,6 +291,7 @@ function BundlesOverviewTab({ allProducts }) {
 const TABS = [
   { key: 'seasonal', label: 'Сейчас в сезоне' },
   { key: 'bundles', label: 'Готовые наборы' },
+  { key: 'special', label: 'Особенно хорошее' },
   { key: 'hits', label: 'Хиты недели' },
   { key: 'deliveries', label: 'Последние доставки' },
 ];
@@ -339,6 +340,22 @@ export default function HomeContent() {
           )}
 
           {tab === 'bundles' && <BundlesOverviewTab allProducts={allProducts} />}
+
+          {tab === 'special' && (
+            <div className="card" style={{ padding: 20 }}>
+              {/* Подборка здесь опциональна: пока она пуста, в блок «Сегодня
+                  особенно хорошее» на Главной попадают все товары с
+                  заполненным тегом (карточка товара → «Тег для блока
+                  „Сегодня особенно хорошее"»). Список ниже нужен, только
+                  когда хочется задать точный состав и порядок. */}
+              <div className="hint" style={{ marginBottom: 14 }}>
+                Сам тег («Сладкая!», «Хрустящие») задаётся на карточке товара — он же и заводит товар в блок.
+                Пока этот список пуст, в блок попадают все товары с заполненным тегом. Добавьте товары сюда,
+                если нужен точный состав и порядок.
+              </div>
+              <ProductShelfPicker shelf="special" allProducts={allProducts} />
+            </div>
+          )}
 
           {tab === 'hits' && (
             <div className="card" style={{ padding: 20 }}>
