@@ -59,6 +59,11 @@ const EMPTY_PRODUCT = {
   // tagLabel сам заводит товар в секцию, отдельной галочки нет.
   tagLabel: '',
   tagColor: '',
+  // «На скольких человек» и «на какой срок» набора (migrations/053) — две
+  // строки рядом с весом на hero-карточке Главной. Пусто → фронт пробует
+  // достать фразу из названия товара, как делал раньше.
+  audienceLabel: '',
+  termLabel: '',
   isBundle: false,
   subcategoryId: null,
   // Nullable — у уже заведённых товаров пусто, пока их не откроют и не
@@ -957,6 +962,34 @@ export default function ProductForm() {
                 Загруженное видео сразу выводит набор в hero-карусель «Готовые наборы» на Главной — отдельно включать ничего не нужно.
                 Несколько наборов с видео — карусель со свайпом, один — статичная карточка. Звука не будет: видео всегда играет без него.
                 Фото для Главной выше остаётся постером, пока видео грузится.
+              </div>
+            </div>
+
+            <div className="field">
+              <label htmlFor="audienceLabel">На скольких человек (опционально)</label>
+              <input
+                id="audienceLabel"
+                type="text"
+                value={form.audienceLabel || ''}
+                onChange={(e) => updateField('audienceLabel', e.target.value)}
+                placeholder="1-2 человека"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="termLabel">На какой срок (опционально)</label>
+              <input
+                id="termLabel"
+                type="text"
+                value={form.termLabel || ''}
+                onChange={(e) => updateField('termLabel', e.target.value)}
+                placeholder="на 5-7 дней"
+              />
+            </div>
+            <div className="field full">
+              <div className="hint">
+                Две строки выше стоят рядом с весом на большой карточке набора на Главной (👥 / ⚖️ / 📅) и выводятся дословно, как написаны —
+                регистр не правится. Не заполнены — фронт попробует достать фразу из названия товара («…для двоих на неделю» → «Для двоих» /
+                «На неделю»), как было раньше.
               </div>
             </div>
 
