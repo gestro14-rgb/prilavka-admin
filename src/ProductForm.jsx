@@ -64,6 +64,9 @@ const EMPTY_PRODUCT = {
   // достать фразу из названия товара, как делал раньше.
   audienceLabel: '',
   termLabel: '',
+  // Витринная сводка состава набора (migrations/055) — блок «Что внутри
+  // набора» на странице товара. Пусто → фронт считает сам из состава.
+  contentsSummary: [],
   isBundle: false,
   subcategoryId: null,
   // Nullable — у уже заведённых товаров пусто, пока их не откроют и не
@@ -130,6 +133,17 @@ const BADGE_TYPES = [
 // произвольных оттенков, и фронт в итоге вынужден это поле игнорировать
 // (см. Badge.jsx в мини-аппе). Пару фон/текст под каждое имя разворачивает
 // фронт из палитры, поэтому она остаётся целой при любом содержимом поля.
+// Словарь для кнопки «посчитать из состава». Держится в синхроне с
+// CONTENTS_DICT в мини-аппе (src/format.js): админ должен видеть ровно то,
+// что покупатель увидит без ручной правки. Расходиться им нельзя — иначе
+// «посчитать» подставит одни числа, а страница покажет другие.
+const CONTENTS_DICT = [
+  ['vegetables', 'Овощи', /картоф|лук|морков|свёкл|свекл|капуст|огур|помидор|томат|перец|баклажан|кабач|цукин|тыкв|редис|чеснок|шампинь|гриб|фасол|горош|кукуруз|сельдер|репа|редьк/i],
+  ['fruits',     'Фрукты', /яблок|груш|апельсин|мандарин|банан|киви|лимон|грейпфрут|персик|нектарин|абрикос|слив|виноград|хурм|гранат|ананас|манго|авокадо|арбуз|дын/i],
+  ['greens',     'Зелень', /зелен|салат|укроп|петрушк|кинз|базилик|руккол|шпинат|щавел|мангольд|мят|розмарин|тимьян|латук|романо|айсберг|порей/i],
+  ['berries',    'Ягоды',  /клубник|земляник|малин|черник|голубик|смородин|ежевик|вишн|черешн|крыжовн|брусник|клюкв/i],
+];
+
 const TAG_COLORS = [
   { value: '',       label: 'Зелёный (по умолчанию)' },
   { value: 'green',  label: 'Зелёный — свежесть, хруст' },
@@ -246,6 +260,7 @@ export default function ProductForm() {
           pricePerKg: p.pricePerKg ?? '',
           individualMarginPercent: p.individualMarginPercent ?? '',
           pricing: normalizePricing(p.pricing),
+          contentsSummary: Array.isArray(p.contentsSummary) ? p.contentsSummary : [],
         });
         setBundleComposition(p.bundleComposition || []);
         setNutrition(
@@ -265,6 +280,41 @@ export default function ProductForm() {
 
   // ===== Основные поля =====
   const updateField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
+
+  // ===== Сводка состава набора =====
+  const updateContentsRow = (index, patch) => setForm((prev) => ({
+    ...prev,
+    contentsSummary: (prev.contentsSummary || []).map((r, i) => (i === index ? { ...r, ...patch } : r)),
+  }));
+  const addContentsRow = () => setForm((prev) => ({
+    ...prev,
+    contentsSummary: [...(prev.contentsSummary || []), { key: '', label: '', count: '' }],
+  }));
+  const removeContentsRow = (index) => setForm((prev) => ({
+    ...prev,
+    contentsSummary: (prev.contentsSummary || []).filter((_, i) => i !== index),
+  }));
+
+  // Считает то же самое, что мини-апп считает сам при пустом поле — чтобы
+  // можно было взять автоподсчёт за основу и поправить руками только то,
+  // где словарь ошибся.
+  const computeContentsFromComposition = () => {
+    const counts = new Map();
+    let unmatched = 0;
+    for (const row of form.composition || []) {
+      const name = Array.isArray(row) ? row[0] : null;
+      const amount = Array.isArray(row) ? row[1] : null;
+      if (!name || !amount) continue;
+      const hit = CONTENTS_DICT.find(([, , re]) => re.test(name));
+      if (hit) counts.set(hit[0], (counts.get(hit[0]) || 0) + 1);
+      else unmatched += 1;
+    }
+    const rows = CONTENTS_DICT
+      .filter(([key]) => counts.get(key) > 0)
+      .map(([key, label]) => ({ key, label, count: counts.get(key) }));
+    if (unmatched > 0 && rows.length < 5) rows.push({ key: 'other', label: 'Ещё продуктов', count: unmatched });
+    updateField('contentsSummary', rows.slice(0, 5));
+  };
 
   // Автоподстановка price = pricePerKg × weightKg — второй, дополнительный
   // способ ввода цены (первый — обычное ручное поле "Цена, ₽" ниже). Флаг,
@@ -544,6 +594,12 @@ export default function ProductForm() {
         amount: Number(p.amount) || 0,
       })),
       isBundle: form.isBundle === true,
+      // Пустые и недозаполненные строки не сохраняем: у карточки должны быть
+      // и подпись, и число, иначе на странице товара получится пустая плитка.
+      contentsSummary: (form.contentsSummary || [])
+        .filter((r) => r.label && Number(r.count) > 0)
+        .map((r) => ({ key: r.key || 'other', label: r.label, count: Number(r.count) }))
+        .slice(0, 5),
       nutrition: nutritionPayload,
     };
     setSaving(true);
@@ -962,6 +1018,55 @@ export default function ProductForm() {
                 Загруженное видео сразу выводит набор в hero-карусель «Готовые наборы» на Главной — отдельно включать ничего не нужно.
                 Несколько наборов с видео — карусель со свайпом, один — статичная карточка. Звука не будет: видео всегда играет без него.
                 Фото для Главной выше остаётся постером, пока видео грузится.
+              </div>
+            </div>
+
+            <div className="field full">
+              <label>Что внутри набора — карточки категорий (опционально)</label>
+              {(form.contentsSummary || []).map((row, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                  <input
+                    type="text"
+                    value={row.label || ''}
+                    onChange={(e) => updateContentsRow(i, { label: e.target.value })}
+                    placeholder="Овощи"
+                    style={{ flex: 2 }}
+                  />
+                  <input
+                    type="text"
+                    value={row.key || ''}
+                    onChange={(e) => updateContentsRow(i, { key: e.target.value })}
+                    placeholder="vegetables"
+                    style={{ flex: 2 }}
+                  />
+                  <input
+                    type="number"
+                    value={row.count ?? ''}
+                    onChange={(e) => updateContentsRow(i, { count: e.target.value === '' ? '' : Number(e.target.value) })}
+                    placeholder="12"
+                    style={{ flex: 1 }}
+                  />
+                  <button type="button" className="btn-secondary" onClick={() => removeContentsRow(i)}>×</button>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                <button type="button" className="btn-secondary" onClick={addContentsRow} disabled={(form.contentsSummary || []).length >= 5}>
+                  + строка
+                </button>
+                <button type="button" className="btn-secondary" onClick={computeContentsFromComposition}>
+                  Посчитать из состава
+                </button>
+                {(form.contentsSummary || []).length > 0 && (
+                  <button type="button" className="btn-secondary" onClick={() => updateField('contentsSummary', [])}>
+                    Очистить
+                  </button>
+                )}
+              </div>
+              <div className="hint" style={{ marginTop: 6 }}>
+                До пяти карточек в блоке «Что внутри набора» на странице товара. Ключ — id категории каталога
+                (vegetables / fruits / greens / berries) — по нему подставляется картинка; для последней карточки
+                можно указать <code>other</code>. Оставьте список пустым — приложение посчитает категории само из
+                состава товара, и правка тут нужна только там, где автоподсчёт ошибся.
               </div>
             </div>
 
