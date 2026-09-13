@@ -23,6 +23,47 @@ const STANDARD_PRICING_TEMPLATE = [
   { label: 'Сервис', sub: 'работа платформы и эквайринг', pct: 15, color: '#C4782A' },
 ];
 
+// Ровно то, что принимает бэкенд при создании товара (POST
+// /api/admin/products). Держим здесь ту же регулярку, что и там: id —
+// опорный ключ, на него ссылаются отзывы, состав наборов, подборки Главной
+// и позиции заказов, поэтому формат строгий и после создания не меняется.
+const PRODUCT_ID_RE = /^[a-z0-9-]+$/;
+
+// Кириллица → латиница. Нужна не для красоты: поле «ID товара» заполняет
+// человек, который думает по-русски, и «помидор» он наберёт кириллицей.
+// Раньше такой ввод молча доезжал до сервера и возвращался ошибкой уже
+// после нажатия «Сохранить» — теперь превращается в «pomidor» прямо в поле.
+const TRANSLIT = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z',
+  и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r',
+  с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh', щ: 'sch',
+  ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
+};
+
+/**
+ * Привести ввод к допустимому id: транслитерация, нижний регистр, всё
+ * остальное — в дефис.
+ *
+ * Дефисы внутри строки не схлопываем и хвостовой не срезаем: иначе нельзя
+ * было бы набрать «tomato-cherry» — дефис исчезал бы сразу после ввода, не
+ * дождавшись следующей буквы. Схлопывание делает normalizeProductId ниже,
+ * уже на отправке.
+ */
+function productIdFromInput(raw) {
+  return String(raw)
+    .toLowerCase()
+    .split('')
+    .map((ch) => (TRANSLIT[ch] !== undefined ? TRANSLIT[ch] : ch))
+    .join('')
+    .replace(/[^a-z0-9-]+/g, '-');
+}
+
+// Финальная нормализация перед отправкой: лишние дефисы по краям и подряд
+// идущие убираем здесь, когда ввод уже закончен.
+function normalizeProductId(raw) {
+  return productIdFromInput(raw).replace(/-+/g, '-').replace(/^-|-$/g, '');
+}
+
 const EMPTY_PRODUCT = {
   id: '',
   slug: '',
@@ -184,6 +225,15 @@ export default function ProductForm() {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Плашка с ошибкой стоит в самом верху страницы, а кнопка «Сохранить» — в
+  // конце формы, которая длиной в несколько экранов. Без этого нажатие на
+  // «Сохранить» с невалидным ID выглядело так, будто ничего не произошло:
+  // сообщение появлялось далеко вверху, вне видимой области.
+  const errorRef = useRef(null);
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [error]);
 
   // Подкатегории — та же связь categories → subcategories, что и в разделе
   // "Подкатегории" админки; список зависит от выбранной категории товара.
@@ -558,8 +608,23 @@ export default function ProductForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!form.id.trim() || !form.title.trim() || !form.category) {
+    // Пробелы по краям срезаем здесь, а не только в проверке: раньше
+    // проверка шла по form.id.trim(), а на сервер уходил сырой form.id —
+    // один пробел в конце (скажем, при вставке из буфера) проходил
+    // проверку и падал уже валидацией бэкенда.
+    const productId = normalizeProductId(form.id);
+    const title = form.title.trim();
+    const slug = form.slug.trim();
+    if (!productId || !title || !form.category) {
       setError('Заполните обязательные поля: ID, название, категория');
+      return;
+    }
+    // Та же регулярка, что на бэкенде. Проверка тут не ради дублирования, а
+    // ради внятного сообщения: сервер отвечал «только латинские буквы,
+    // цифры и дефис», и человек, набравший «Tomato-1», не понимал, что
+    // именно не так — про нижний регистр там не сказано ни слова.
+    if (!PRODUCT_ID_RE.test(productId)) {
+      setError('ID: только строчные латинские буквы, цифры и дефис — например, tomato-cherry');
       return;
     }
     // Пищевая ценность опциональна целиком: если ни одно поле не заполнено —
@@ -577,6 +642,9 @@ export default function ProductForm() {
 
     const payload = {
       ...form,
+      id: productId,
+      title,
+      slug,
       price: Number(form.price) || 0,
       oldPrice: form.oldPrice !== '' && form.oldPrice != null ? Number(form.oldPrice) : null,
       purchasePrice: form.purchasePrice !== '' && form.purchasePrice != null ? Number(form.purchasePrice) : null,
@@ -625,7 +693,7 @@ export default function ProductForm() {
         <h2>{isNew ? 'Новый товар' : `Редактирование: ${form.title}`}</h2>
       </div>
 
-      {error && <div className="alert error">{error}</div>}
+      {error && <div ref={errorRef} className="alert error">{error}</div>}
 
       <form onSubmit={handleSubmit}>
         <div className="card" style={{ padding: 24 }}>
@@ -636,14 +704,19 @@ export default function ProductForm() {
                 id="id"
                 type="text"
                 value={form.id}
-                onChange={(e) => updateField('id', e.target.value)}
+                // Приводим ввод к допустимому виду прямо в поле, а не
+                // ругаемся после «Сохранить»: набранное кириллицей
+                // транслитерируется, заглавные опускаются, пробелы и
+                // подчёркивания становятся дефисом. В поле физически не
+                // может оказаться значение, которое отвергнет сервер.
+                onChange={(e) => updateField('id', productIdFromInput(e.target.value))}
                 disabled={!isNew}
-                placeholder="например, tomato"
+                placeholder="например, tomato-cherry"
                 required
               />
               <div className="hint">
                 {isNew
-                  ? 'Латиницей, без пробелов. Используется во внутренних связях (отзывы, наборы, подборки), изменить позже нельзя.'
+                  ? 'Строчная латиница, цифры и дефис. Можно набирать по-русски — переведётся само. Используется во внутренних связях (отзывы, наборы, подборки), изменить позже нельзя.'
                   : 'ID товара изменить нельзя после создания — это внутренняя связь, не показывается покупателю. Для переименования используйте поле "Слаг" ниже.'}
               </div>
             </div>
