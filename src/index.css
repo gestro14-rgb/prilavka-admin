@@ -416,3 +416,60 @@ a {
   color: var(--ink);
   margin: 28px 0 12px;
 }
+
+/* Переключатель вкладок раздела. Был рядом обычных .btn-primary/.btn-secondary:
+   активная вкладка отличалась от прочих ровно так же, как «Сохранить»
+   отличается от «Отмена», и весь ряд читался набором действий, а не
+   переключателем. Из-за этого вкладку «Сегодня на прилавке» на экране
+   «Главная страница» просто не находили.
+   flex-wrap + nowrap у самих кнопок: на узком окне ряд переносится на
+   вторую строку, а не уезжает в горизонтальный скролл. */
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+.tab-bar button {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: none;
+  border: none;
+  border-radius: 9px;
+  padding: 9px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tab-bar button:hover { color: var(--ink); }
+.tab-bar button[aria-selected="true"] {
+  background: var(--bg);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(21, 32, 27, 0.10);
+}
+
+/* Пояснение под заголовком или над контролом. Класс .hint до сих пор был
+   объявлен только как .field .hint — вне формы он не давал ничего, и
+   подсказки в разделах рисовались обычным текстом в размер контента.
+   Правило в .field осталось выше по файлу и перебивает это по
+   специфичности, так что вид подсказок в формах не меняется. */
+.hint {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+.section-hint {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  margin-bottom: 16px;
+}

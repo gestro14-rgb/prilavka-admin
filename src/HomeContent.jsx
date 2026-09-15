@@ -83,9 +83,14 @@ function ProductShelfPicker({ shelf, allProducts }) {
     <div>
       {error && <div className="alert error" style={{ marginBottom: 12 }}>{error}</div>}
 
+      {/* Текст пустого состояния объясняет, что происходит сейчас и что
+          изменится, — прежний («автоподбор по меткам товара (как раньше)»)
+          требовал знать, что такое метки и какое было «раньше». */}
       {items.length === 0 ? (
         <div className="empty-hint" style={{ marginBottom: 16 }}>
-          Подборка пуста — Главная сейчас показывает автоподбор по меткам товара (как раньше). Добавьте хотя бы один товар, чтобы включить ручной порядок.
+          Список пуст: сейчас товары для блока подбираются автоматически.
+          <br />
+          Добавьте хотя бы один товар ниже — и состав блока начнёт управляться отсюда.
         </div>
       ) : (
         <table className="product-table" style={{ marginBottom: 16 }}>
@@ -93,7 +98,14 @@ function ProductShelfPicker({ shelf, allProducts }) {
             <tr>
               <th></th>
               <th>Товар</th>
-              <th style={{ width: 100 }}>Порядок</th>
+              {/* Подпись столбца объясняет, как читать число: без неё
+                  было непонятно, растёт порядок сверху вниз или наоборот. */}
+              <th style={{ width: 140 }}>
+                Порядок
+                <div className="hint" style={{ fontSize: 11, fontWeight: 500, textTransform: 'none', letterSpacing: 'normal', marginTop: 2 }}>
+                  меньше — выше в блоке
+                </div>
+              </th>
               <th></th>
             </tr>
           </thead>
@@ -132,8 +144,13 @@ function ProductShelfPicker({ shelf, allProducts }) {
         </table>
       )}
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <select value={selectedProductId} onChange={(e) => setSelectedProductId(e.target.value)} style={{ flex: 1 }}>
+      {/* Подпись над строкой добавления: селект с кнопкой снизу таблицы
+          легко принять за фильтр списка, а не за добавление в блок. */}
+      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)', marginBottom: 6 }}>
+        Добавить товар в блок
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <select value={selectedProductId} onChange={(e) => setSelectedProductId(e.target.value)} style={{ flex: '1 1 200px', minWidth: 0 }}>
           <option value="">Выберите товар…</option>
           {availableProducts.map((p) => (
             <option key={p.id} value={p.id}>{p.title}</option>
@@ -313,12 +330,21 @@ export default function HomeContent() {
         <h2>Главная страница</h2>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+      {/* Переключатель разделов, а не ряд кнопок. Логика та же — tab в
+          локальном состоянии; меняется только вид: подложка вокруг всего
+          ряда, активная вкладка белой плашкой, остальные приглушены.
+          Раньше это были .btn-primary и .btn-secondary, то есть ровно та
+          же пара, что у «Сохранить» и «Отмена», и ряд читался набором
+          действий — вкладку «Сегодня на прилавке» на этом экране не
+          находили. */}
+      <div className="tab-bar" role="tablist" aria-label="Разделы Главной">
         {TABS.map((t) => (
           <button
             key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
             onClick={() => setTab(t.key)}
-            className={tab === t.key ? 'btn-primary' : 'btn-secondary'}
           >
             {t.label}
           </button>
@@ -349,13 +375,15 @@ export default function HomeContent() {
                   «Сегодня на прилавке» на Главной попадают товары с
                   заполненным тегом (карточка товара → поле «Тег»). Список
                   ниже нужен, когда важен точный состав и порядок. */}
-              <div className="hint" style={{ marginBottom: 14 }}>
-                Это блок «Сегодня на прилавке» на Главной. Порядок товаров здесь — тот же, что увидит покупатель;
-                на телефоне в экран помещается четыре карточки, остальные доступны прокруткой ряда вбок.
+              <h3 style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', marginBottom: 6 }}>
+                Товары блока «Сегодня на прилавке» на Главной
+              </h3>
+              <div className="section-hint">
+                Выберите товары, которые покупатель увидит в этом блоке, и задайте их порядок. Ряд прокручивается
+                вбок: на телефоне в экран помещается четыре карточки, остальные доступны свайпом.
                 <br />
                 Пока список пуст, в блок попадают все товары с заполненным полем «Тег» на карточке товара
-                (сам тег на витрине больше не печатается — он только отбирает товары). Добавьте товары сюда,
-                если нужен точный состав и порядок.
+                (сам тег на витрине не печатается — он только отбирает товары).
               </div>
               <ProductShelfPicker shelf="special" allProducts={allProducts} />
             </div>
