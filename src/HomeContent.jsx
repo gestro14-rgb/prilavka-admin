@@ -163,6 +163,117 @@ function ProductShelfPicker({ shelf, allProducts }) {
     </div>
   );
 }
+// Видимость витрин Главной (migrations/056). Хранится в тех же settings,
+// что и заголовки блоков выше, — одна строка на блок,
+// home_section_<ключ>_visible со значением 'true' | 'false'. Правится той
+// же ручкой PUT /api/admin/settings/:key.
+//
+// Ключи совпадают с ключами витрин в home_product_shelves и с вкладками
+// этой страницы. Состав и видимость независимы: выключение ничего не
+// удаляет, включение возвращает тот же список в том же порядке.
+const VISIBILITY_SECTIONS = [
+  { key: 'special', label: 'Сегодня на прилавке' },
+  { key: 'bundles', label: 'Готовые наборы' },
+  { key: 'seasonal', label: 'Сейчас в сезоне' },
+  { key: 'hits', label: 'Хиты недели' },
+];
+
+const visibilitySettingKey = (section) => `home_section_${section}_visible`;
+
+function SectionVisibilityEditor() {
+  const [values, setValues] = useState(null);
+  const [savingKey, setSavingKey] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api
+      .getSettings()
+      .then((rows) => {
+        const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+        // Нет строки — блок видим. Ровно так же читает бэкенд: любое
+        // значение, кроме 'false', означает «показывать». Поэтому раздел
+        // работает и до применения миграции, просто сохранить тогда не
+        // получится — ручка настроек обновляет существующую строку.
+        setValues(Object.fromEntries(
+          VISIBILITY_SECTIONS.map((s) => [s.key, map[visibilitySettingKey(s.key)] !== 'false'])
+        ));
+      })
+      .catch((e) => setError(e.message));
+  }, []);
+
+  if (error && values === null) return <div className="alert error">{error}</div>;
+  if (values === null) return <div className="loading">Загрузка…</div>;
+
+  const toggle = async (key) => {
+    const next = !values[key];
+    setSavingKey(key);
+    setError('');
+    try {
+      await api.updateSetting(visibilitySettingKey(key), next ? 'true' : 'false');
+      setValues((prev) => ({ ...prev, [key]: next }));
+    } catch (e) {
+      // Частый случай — не применена миграция 056: строки настройки нет, и
+      // ручка отвечает 404. Говорим об этом прямо, а не «ошибка запроса».
+      setError(e.status === 404
+        ? 'Настройка ещё не заведена в базе — нужно применить миграцию 056_home_section_visibility.sql'
+        : e.message);
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  return (
+    <div className="card" style={{ padding: 20 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', marginBottom: 6 }}>
+        Видимость блоков на Главной
+      </h3>
+      <div className="section-hint">
+        Выключенный блок не показывается покупателю, но его товары и порядок сохраняются —
+        это временное скрытие, а не удаление. Включите обратно, и блок вернётся в том же составе.
+      </div>
+
+      <table className="product-table">
+        <thead>
+          <tr>
+            <th>Блок</th>
+            <th style={{ width: 150 }}>Показывать</th>
+            <th>Состояние</th>
+          </tr>
+        </thead>
+        <tbody>
+          {VISIBILITY_SECTIONS.map((s) => (
+            <tr key={s.key}>
+              <td style={{ fontWeight: 700 }}>{s.label}</td>
+              <td>
+                <button
+                  type="button"
+                  className={`switch${values[s.key] ? ' is-on' : ''}`}
+                  role="switch"
+                  aria-checked={values[s.key]}
+                  aria-label={`Показывать блок «${s.label}» на Главной`}
+                  onClick={() => toggle(s.key)}
+                  disabled={savingKey === s.key}
+                >
+                  <span className="switch-knob" />
+                  <span className="switch-text">{values[s.key] ? 'ON' : 'OFF'}</span>
+                </button>
+              </td>
+              <td className="hint">
+                {savingKey === s.key
+                  ? 'Сохраняем…'
+                  : values[s.key]
+                    ? 'Блок отображается на Главной.'
+                    : 'Блок скрыт с Главной. Товары и порядок сохранены.'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {error && <div className="alert error" style={{ marginTop: 12 }}>{error}</div>}
+    </div>
+  );
+}
 
 // Заголовок/подзаголовок "Сейчас в сезоне" — хранятся в общей таблице
 // settings (тот же механизм, что и остальные настройки), просто редактируются
@@ -313,6 +424,11 @@ const TABS = [
   { key: 'special', label: 'Сегодня на прилавке' },
   { key: 'hits', label: 'Хиты недели' },
   { key: 'deliveries', label: 'Последние доставки' },
+  // Отдельная вкладка, а не выключатель внутри каждой: так все блоки видно
+  // одним списком и сразу понятно, что сейчас показывается покупателю, а
+  // что скрыто. Внутри вкладки состава выключатель был бы незаметен — за
+  // ним пришлось бы ходить по четырём вкладкам.
+  { key: 'visibility', label: 'Видимость блоков' },
 ];
 
 export default function HomeContent() {
@@ -396,6 +512,8 @@ export default function HomeContent() {
           )}
 
           {tab === 'deliveries' && <Deliveries />}
+
+          {tab === 'visibility' && <SectionVisibilityEditor />}
         </>
       )}
     </div>
