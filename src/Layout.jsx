@@ -28,6 +28,11 @@ export default function Layout() {
           <NavLink to="/products" className={({ isActive }) => (isActive ? 'active' : '')}>
             🧺 Товары
           </NavLink>
+          {/* Сразу под «Товарами»: бейджи назначаются в карточке товара, и
+              искать их логично рядом, а не в конце списка среди настроек. */}
+          <NavLink to="/badges" className={({ isActive }) => (isActive ? 'active' : '')}>
+            🏷️ Бейджи товаров
+          </NavLink>
           <NavLink to="/categories" className={({ isActive }) => (isActive ? 'active' : '')}>
             🏷️ Категории
           </NavLink>

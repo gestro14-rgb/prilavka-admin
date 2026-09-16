@@ -320,6 +320,17 @@ export const api = {
       method: 'DELETE',
     }),
 
+  // ── Библиотека бейджей товаров (migrations/057) ──────────────────────
+  getBadges: () => request('/api/admin/badges'),
+  createBadge: (data) => request('/api/admin/badges', { method: 'POST', body: JSON.stringify(data) }),
+  updateBadge: (id, data) => request(`/api/admin/badges/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteBadge: (id) => request(`/api/admin/badges/${id}`, { method: 'DELETE' }),
+  // Бейджи одного товара. Сохраняются списком целиком: порядок задаётся
+  // позицией в массиве, отдельного поля админке вести не нужно.
+  getProductBadges: (productId) => request(`/api/admin/products/${productId}/badges`),
+  setProductBadges: (productId, badgeIds) =>
+    request(`/api/admin/products/${productId}/badges`, { method: 'PUT', body: JSON.stringify({ badgeIds }) }),
+
   getSettings: () => request('/api/admin/settings'),
   updateSetting: (key, value) =>
     request(`/api/admin/settings/${key}`, {

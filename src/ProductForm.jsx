@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from './api';
 import ImageUploadField from './ImageUploadField';
 import MediaUploadField from './MediaUploadField';
+import { BadgePreview } from './Badges';
 import { calcPricing, pricingStatus, calcCurrentPriceMargin, effectivePurchaseCost } from './pricingCalc';
 
 // Округление сумм в "Из чего складывается цена": обычный Math.round округляет
@@ -230,6 +231,34 @@ export default function ProductForm() {
   // конце формы, которая длиной в несколько экранов. Без этого нажатие на
   // «Сохранить» с невалидным ID выглядело так, будто ничего не произошло:
   // сообщение появлялось далеко вверху, вне видимой области.
+  // Бейджи из библиотеки (migrations/057). Библиотека — весь список
+  // доступных бейджей, badgeIds — назначенные этому товару в нужном
+  // порядке. Порядок хранится позицией в массиве: сервер принимает список
+  // целиком и сам расставляет sort_order.
+  const [badgeLibrary, setBadgeLibrary] = useState(null);
+  const [badgeIds, setBadgeIds] = useState([]);
+
+  useEffect(() => {
+    // Библиотека нужна и новому товару — показать, что она пуста, и
+    // объяснить, где её заполнить.
+    api.getBadges().then(setBadgeLibrary).catch(() => setBadgeLibrary([]));
+  }, []);
+
+  useEffect(() => {
+    if (isNew) return;
+    api.getProductBadges(id).then((rows) => setBadgeIds(rows.map((r) => r.id))).catch(() => {});
+  }, [id, isNew]);
+
+  const moveBadge = (index, delta) => {
+    setBadgeIds((prev) => {
+      const next = [...prev];
+      const to = index + delta;
+      if (to < 0 || to >= next.length) return prev;
+      [next[index], next[to]] = [next[to], next[index]];
+      return next;
+    });
+  };
+
   const errorRef = useRef(null);
   useEffect(() => {
     if (error) errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -676,6 +705,11 @@ export default function ProductForm() {
         await api.createProduct(payload);
       } else {
         await api.updateProduct(id, payload);
+        // Бейджи — отдельной ручкой и только у существующего товара:
+        // привязка ссылается на products.id, которого у нового товара до
+        // создания ещё нет. Строго после updateProduct — если товар не
+        // сохранился, менять его бейджи незачем.
+        await api.setProductBadges(id, badgeIds);
       }
       navigate('/products');
     } catch (e) {
@@ -1348,6 +1382,116 @@ export default function ProductForm() {
                   </option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          {/* ── Бейджи из библиотеки (migrations/057) ──────────────────
+              Отдельно от «Метки на карточке» выше: та лежит в
+              products.badge_type и, кроме вида, участвует в подборе
+              «Хитов недели». Здесь — чистое оформление, сама библиотека
+              редактируется в разделе «Бейджи товаров».
+
+              Сохраняются вместе с товаром, одной кнопкой «Сохранить»
+              внизу формы: отдельная кнопка рядом со списком означала бы,
+              что часть правки уехала на сервер, а часть нет. У нового
+              товара блок не показывается — привязывать бейджи не к чему,
+              пока у товара нет id. */}
+          <div className="section-label">Бейджи ({badgeIds.length})</div>
+          <div className="form-grid">
+            <div className="field full">
+              {badgeLibrary === null ? (
+                <div className="hint">Загрузка библиотеки бейджей…</div>
+              ) : badgeLibrary.length === 0 ? (
+                <div className="hint">
+                  Библиотека пуста. Создайте бейдж в разделе «Бейджи товаров» — он появится в этом списке.
+                </div>
+              ) : isNew ? (
+                <div className="hint">
+                  Бейджи можно будет назначить после создания товара.
+                </div>
+              ) : (
+                <>
+                  {badgeIds.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                      {badgeIds.map((id, i) => {
+                        const b = badgeLibrary.find((x) => x.id === id);
+                        if (!b) return null;
+                        return (
+                          <div
+                            key={id}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                              padding: '8px 10px', borderRadius: 10, border: '1px solid var(--line)',
+                              opacity: b.isActive ? 1 : 0.55,
+                            }}
+                          >
+                            <span style={{ width: 22, textAlign: 'center', fontWeight: 800, color: 'var(--ink-soft)' }}>{i + 1}</span>
+                            <BadgePreview badge={b} scale={1.6} />
+                            {!b.isActive && <span className="hint">выключен — не показывается покупателю</span>}
+                            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                              {/* Кнопки вверх/вниз, а не drag-and-drop:
+                                  в админке нет ни одной перетаскиваемой
+                                  таблицы, и заводить её ради двух-трёх
+                                  строк несоразмерно. */}
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                onClick={() => moveBadge(i, -1)}
+                                disabled={i === 0}
+                                aria-label="Выше"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                onClick={() => moveBadge(i, 1)}
+                                disabled={i === badgeIds.length - 1}
+                                aria-label="Ниже"
+                              >
+                                ↓
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-danger"
+                                onClick={() => setBadgeIds((prev) => prev.filter((x) => x !== id))}
+                              >
+                                Убрать
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const id = Number(e.target.value);
+                        if (id) setBadgeIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+                      }}
+                      style={{ flex: '1 1 220px', minWidth: 0 }}
+                      aria-label="Добавить бейдж"
+                    >
+                      <option value="">+ Добавить бейдж…</option>
+                      {badgeLibrary
+                        .filter((b) => !badgeIds.includes(b.id))
+                        .map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {(b.icon ? b.icon + ' ' : '') + b.label + (b.isActive ? '' : ' (выключен)')}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div className="hint" style={{ marginTop: 8 }}>
+                    Первый в списке — тот, что увидят на карточке товара в каталоге и на Главной: там помещается
+                    один бейдж. На странице товара показываются все включённые.
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
