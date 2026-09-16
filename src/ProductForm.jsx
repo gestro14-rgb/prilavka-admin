@@ -78,6 +78,7 @@ const EMPTY_PRODUCT = {
   bg: 'linear-gradient(135deg, #F4F7F2, #fff)',
   category: 'vegetables',
   badge: null,
+  origin: '',
   composition: [],
   suppliers: [],
   pricing: [],
@@ -683,6 +684,7 @@ export default function ProductForm() {
       individualMarginPercent: form.individualMarginPercent !== '' ? Number(form.individualMarginPercent) : null,
       sortOrder: Number(form.sortOrder) || 0,
       badge: form.badge && form.badge.type ? form.badge : null,
+      origin: form.origin?.trim() || null,
       composition: form.composition.filter((row) => row[0] || row[1]),
       suppliers: form.suppliers.filter((s) => s.name),
       pricing: form.pricing.map((p) => ({
@@ -780,6 +782,26 @@ export default function ProductForm() {
                 placeholder="например, Томаты семейные"
                 required
               />
+            </div>
+
+            {/* Происхождение — отдельным полем, а не внутри названия:
+                на витрине оно выводится своей строкой под названием.
+                Формат свободный и разноуровневый («Краснодар»,
+                «Ростовская область», «ЮАР») — справочника регионов в
+                проекте нет. Пусто — строка на витрине не появится. */}
+            <div className="field">
+              <label htmlFor="origin">Происхождение</label>
+              <input
+                id="origin"
+                type="text"
+                value={form.origin || ''}
+                onChange={(e) => updateField('origin', e.target.value)}
+                placeholder="например, Краснодар"
+              />
+              <div className="hint">
+                Город, регион или страна. Показывается на витрине отдельной строкой под
+                названием — вписывать его в само название не нужно. Наборов не касается.
+              </div>
             </div>
 
             <div className="field">
