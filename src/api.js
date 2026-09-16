@@ -356,6 +356,30 @@ export const api = {
 
   getStats: () => request('/api/admin/stats'),
 
+  // Ключевые показатели периода со сравнением с предыдущим (migrations/058).
+  getAnalyticsOverview: ({ from, to } = {}) => {
+    const p = new URLSearchParams();
+    if (from) p.set('from', from);
+    if (to) p.set('to', to);
+    return request(`/api/admin/analytics/overview?${p.toString()}`);
+  },
+  getAnalyticsProducts: ({ from, to } = {}) => {
+    const p = new URLSearchParams();
+    if (from) p.set('from', from);
+    if (to) p.set('to', to);
+    return request(`/api/admin/analytics/products?${p.toString()}`);
+  },
+  // Кто исключён из аналитики. Telegram id наружу не печатается — только
+  // подпись и причина.
+  getAnalyticsExcluded: () => request('/api/admin/analytics/excluded'),
+  setAnalyticsExcludedActive: (telegramId, isActive) =>
+    request(`/api/admin/analytics/excluded/${encodeURIComponent(telegramId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ isActive }),
+    }),
+  addAnalyticsExcluded: (data) =>
+    request('/api/admin/analytics/excluded', { method: 'POST', body: JSON.stringify(data) }),
+
   getAnalyticsFunnel: ({ from, to, utmSource, utmCampaign } = {}) => {
     const params = new URLSearchParams();
     if (from) params.set('from', from);

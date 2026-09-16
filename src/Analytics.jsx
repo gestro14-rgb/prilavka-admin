@@ -239,6 +239,183 @@ function CheckoutStepsBlock({ steps, loading }) {
   );
 }
 
+// ── Ключевые показатели ─────────────────────────────────────────────────
+//
+// Шесть чисел, по которым видно состояние магазина за период. Считает их
+// бэкенд — включая проценты изменения: одна метрика не должна иметь двух
+// определений в двух местах.
+const KPI = [
+  { key: 'visitors', label: 'Посетители', hint: 'Уникальные люди за период. Один человек, зашедший пять раз, — это один посетитель.' },
+  { key: 'sessions', label: 'Сессии', hint: 'Сколько раз открывали приложение. Сессия — одно открытие мини-аппа.' },
+  { key: 'orders', label: 'Заказы', hint: 'Созданные заказы за период, кроме отменённых.' },
+  { key: 'revenue', label: 'Выручка', money: true, hint: 'Сумма заказов за период, кроме отменённых.' },
+  { key: 'conversion', label: 'Конверсия в заказ', pct: true, hint: 'Доля сессий, в которых дошли до оформленного заказа.' },
+  { key: 'avgCheck', label: 'Средний чек', money: true, hint: 'Выручка, делённая на число заказов.' },
+];
+
+const fmtNum = (v) => (v == null ? '—' : v.toLocaleString('ru-RU'));
+
+function KpiCards({ overview, loading }) {
+  if (loading && !overview) return <div className="loading">Загрузка…</div>;
+  if (!overview) return null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 32 }}>
+      {KPI.map((k) => {
+        const m = overview.metrics[k.key] || {};
+        const value = k.pct
+          ? (m.value == null ? null : m.value + '%')
+          : k.money
+            ? (m.value == null ? null : fmtNum(m.value) + ' ₽')
+            : fmtNum(m.value);
+        const up = m.changePct != null && m.changePct > 0;
+        const flat = m.changePct === 0;
+        return (
+          <div key={k.key} className="card" style={{ padding: 16 }} title={k.hint}>
+            <div className="hint" style={{ marginBottom: 6 }}>{k.label}</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--ink)', lineHeight: 1.1 }}>
+              {value == null ? '—' : value}
+            </div>
+            {/* Изменение показываем, только когда прошлый период есть с чем
+                сравнить: рост «с нуля» в процентах не выражается. */}
+            <div className="hint" style={{ marginTop: 6 }}>
+              {m.changePct == null
+                ? (k.pct && m.value == null ? `нужно ≥ ${overview.minSampleForRates} сессий` : 'не с чем сравнить')
+                : (
+                  <span style={{ color: flat ? 'var(--ink-soft)' : up ? 'var(--accent)' : 'var(--danger)' }}>
+                    {up ? '+' : ''}{m.changePct}% к прошлому периоду ({k.money ? fmtNum(m.prev) + ' ₽' : fmtNum(m.prev)})
+                  </span>
+                )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Где теряются люди ───────────────────────────────────────────────────
+//
+// Та же воронка, но повёрнутая к вопросу «на каком шаге уходят». Берём
+// переходы между соседними ступенями и сортируем по величине падения.
+// Формулировки нейтральные: «остаётся N%», а не «плохо» — на десятках
+// сессий один-два человека меняют картину целиком.
+function DropOffBlock({ funnel, minSample }) {
+  if (!funnel?.stages?.length) return <div className="hint">Пока недостаточно данных.</div>;
+  const steps = [];
+  for (let i = 1; i < funnel.stages.length; i += 1) {
+    const prev = funnel.stages[i - 1];
+    const cur = funnel.stages[i];
+    if (prev.count === 0) continue;
+    steps.push({
+      from: prev.label,
+      to: cur.label,
+      fromCount: prev.count,
+      toCount: cur.count,
+      keepPct: Math.round((cur.count / prev.count) * 1000) / 10,
+      lost: prev.count - cur.count,
+      enough: prev.count >= minSample,
+    });
+  }
+  if (steps.length === 0) return <div className="hint">Пока недостаточно данных.</div>;
+  const worst = [...steps].filter((s) => s.enough).sort((a, b) => a.keepPct - b.keepPct)[0];
+  return (
+    <div>
+      {steps.map((s) => (
+        <div
+          key={s.from + s.to}
+          style={{
+            display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12,
+            padding: '10px 0', borderBottom: '1px solid var(--line)', flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, color: 'var(--ink)' }}>{s.from} → {s.to}</div>
+            <div className="hint">
+              {fmtNum(s.fromCount)} → {fmtNum(s.toCount)}
+              {s.lost > 0 ? `, не дошли ${fmtNum(s.lost)}` : ''}
+              {worst && worst.from === s.from && worst.to === s.to ? ' · наибольшее снижение между шагами' : ''}
+            </div>
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: s.enough ? 'var(--ink)' : 'var(--ink-soft)' }}>
+            {s.enough ? `остаётся ${s.keepPct}%` : 'мало данных'}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Товары ──────────────────────────────────────────────────────────────
+function ProductTable({ rows, columns, empty }) {
+  if (!rows || rows.length === 0) return <div className="hint" style={{ padding: 16 }}>{empty}</div>;
+  return (
+    <table className="product-table">
+      <thead>
+        <tr>
+          <th>Товар</th>
+          {columns.map((c) => <th key={c.key} style={{ textAlign: 'right', width: 110 }}>{c.label}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.id}>
+            <td style={{ fontWeight: 700 }}>{r.title}</td>
+            {columns.map((c) => (
+              <td key={c.key} style={{ textAlign: 'right' }}>
+                {c.money ? fmtNum(r[c.key]) + ' ₽' : c.pct ? (r[c.key] == null ? '—' : r[c.key] + '%') : fmtNum(r[c.key])}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+// ── Исключённые из аналитики ────────────────────────────────────────────
+//
+// Telegram id здесь не печатается: в строке только подпись и причина.
+function ExcludedBlock({ rows, onToggle, busyId }) {
+  if (!rows) return <div className="loading">Загрузка…</div>;
+  if (rows.length === 0) return <div className="hint" style={{ padding: 16 }}>Никто не исключён — считаются все сессии.</div>;
+  const REASON = { owner: 'Владелец', admin: 'Администратор', test: 'Тестовый аккаунт' };
+  return (
+    <table className="product-table">
+      <thead>
+        <tr>
+          <th>Кто</th>
+          <th style={{ width: 160 }}>Причина</th>
+          <th style={{ width: 140, textAlign: 'right' }}>Сессий в базе</th>
+          <th style={{ width: 150 }}>Исключён</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.id} style={{ opacity: r.isActive ? 1 : 0.55 }}>
+            <td style={{ fontWeight: 700 }}>{r.note}</td>
+            <td className="hint">{REASON[r.reason] || r.reason}</td>
+            <td style={{ textAlign: 'right' }}>{fmtNum(r.sessions)}</td>
+            <td>
+              <button
+                type="button"
+                className={`switch${r.isActive ? ' is-on' : ''}`}
+                role="switch"
+                aria-checked={r.isActive}
+                aria-label={`Исключить «${r.note}» из аналитики`}
+                onClick={() => onToggle(r)}
+                disabled={busyId === r.id}
+              >
+                <span className="switch-knob" />
+                <span className="switch-text">{r.isActive ? 'ON' : 'OFF'}</span>
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 export default function Analytics() {
   const [from, setFrom] = useState(() => daysAgoISO(7));
   const [to, setTo] = useState(() => todayISO());
@@ -247,6 +424,11 @@ export default function Analytics() {
   // одним контролом, а пары источник+кампания не могут разъехаться между
   // собой (кампания всегда принадлежит своему источнику).
   const [sourceFilter, setSourceFilter] = useState('');
+
+  const [overview, setOverview] = useState(null);
+  const [products, setProducts] = useState(null);
+  const [excluded, setExcluded] = useState(null);
+  const [excludedBusy, setExcludedBusy] = useState(null);
 
   const [funnel, setFunnel] = useState(null);
   const [topScreens, setTopScreens] = useState(null);
@@ -278,12 +460,18 @@ export default function Analytics() {
       // Список источников не зависит от выбранного источника — иначе,
       // отфильтровав по одному, из селекта пропали бы все остальные.
       api.getAnalyticsSources({ from, to }),
+      api.getAnalyticsOverview({ from, to }),
+      api.getAnalyticsProducts({ from, to }),
+      api.getAnalyticsExcluded(),
     ])
-      .then(([f, t, s, src]) => {
+      .then(([f, t, s, src, ov, pr, ex]) => {
         setFunnel(f);
         setTopScreens(t);
         setSessions(s);
         setSources(src);
+        setOverview(ov);
+        setProducts(pr);
+        setExcluded(ex);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -372,6 +560,24 @@ export default function Analytics() {
         </div>
       </div>
 
+      {/* ── 1. Что произошло ────────────────────────────────────────────
+          Первое, что видно на экране: шесть чисел за период и как они
+          изменились к прошлому такому же отрезку. */}
+      <div className="section-label" style={{ marginTop: 0 }}>Ключевые показатели</div>
+      <div className="hint" style={{ marginBottom: 12 }}>
+        {overview
+          ? `Период ${overview.from.slice(0, 10)} — ${overview.to.slice(0, 10)}, сравнение с ${overview.prevFrom.slice(0, 10)} — ${overview.prevTo.slice(0, 10)}. Сессии владельца и тестовых аккаунтов не учитываются.`
+          : 'Сессии владельца и тестовых аккаунтов не учитываются.'}
+      </div>
+      <KpiCards overview={overview} loading={loading} />
+
+      {/* ── 2. Где теряем ───────────────────────────────────────────────
+          Та же воронка, повёрнутая к главному вопросу владельца. */}
+      <div className="section-label">Где теряются люди</div>
+      <div className="card" style={{ padding: 20, marginBottom: 32 }}>
+        <DropOffBlock funnel={funnel} minSample={overview?.minSampleForRates ?? 20} />
+      </div>
+
       {/* До приложения: лендинг → открытие мини-аппа */}
       <div className="section-label" style={{ marginTop: 0 }}>До приложения</div>
       <PreFunnelBlock preFunnel={funnel?.preFunnel} />
@@ -386,6 +592,50 @@ export default function Analytics() {
       <div className="section-label">Внутри оформления</div>
       <div className="card" style={{ padding: 24, marginBottom: 32 }}>
         <CheckoutStepsBlock steps={funnel?.checkoutSteps} loading={loading && !funnel} />
+      </div>
+
+      {/* ── 3. Какие товары это объясняют ───────────────────────────── */}
+      <div className="section-label">Товары</div>
+      <div className="hint" style={{ marginBottom: 12 }}>
+        Просмотры и добавления — по сессиям: один человек, открывший карточку трижды за одно посещение,
+        считается один раз. Продажи и выручка — из заказов, кроме отменённых и подарков за баллы.
+      </div>
+
+      <div className="card" style={{ marginBottom: 16, overflowX: 'auto' }}>
+        <div style={{ padding: '14px 16px 0', fontWeight: 800, color: 'var(--ink)' }}>Чаще смотрят</div>
+        <ProductTable
+          rows={products?.topViewed}
+          columns={[
+            { key: 'views', label: 'Смотрели' },
+            { key: 'addToCart', label: 'В корзину' },
+            { key: 'addRatePct', label: 'Доля', pct: true },
+          ]}
+          empty="Пока недостаточно данных: просмотров карточек за период нет."
+        />
+      </div>
+
+      <div className="card" style={{ marginBottom: 16, overflowX: 'auto' }}>
+        <div style={{ padding: '14px 16px 0', fontWeight: 800, color: 'var(--ink)' }}>Чаще покупают</div>
+        <ProductTable
+          rows={products?.topSold}
+          columns={[
+            { key: 'units', label: 'Штук' },
+            { key: 'orders', label: 'Заказов' },
+            { key: 'revenue', label: 'Выручка', money: true },
+          ]}
+          empty="За период не было продаж."
+        />
+      </div>
+
+      {/* Блок появляется, только когда просмотров хватает, чтобы вывод
+          что-то значил, — порог задаёт бэкенд. */}
+      <div className="card" style={{ marginBottom: 32, overflowX: 'auto' }}>
+        <div style={{ padding: '14px 16px 0', fontWeight: 800, color: 'var(--ink)' }}>Смотрят, но не добавляют</div>
+        <ProductTable
+          rows={products?.viewedNotAdded}
+          columns={[{ key: 'views', label: 'Смотрели' }]}
+          empty={`Таких товаров нет: либо всё добавляют, либо просмотров меньше ${products?.minSampleForRates ?? 10} и делать вывод рано.`}
+        />
       </div>
 
       {/* Топ экранов */}
@@ -509,6 +759,43 @@ export default function Analytics() {
           )}
         </div>
       )}
+
+      {/* ── 4. Чьи сессии не считаются ──────────────────────────────────
+          Внизу страницы: это настройка, а не показатель. Telegram id
+          здесь не печатается — только подпись и причина. */}
+      <div className="section-label">Исключены из аналитики</div>
+      <div className="hint" style={{ marginBottom: 12 }}>
+        Сессии этих аккаунтов не попадают ни в один показатель выше: ни в посетителей, ни в сессии,
+        ни в воронку, ни в товары. События при этом не удаляются — выключите переключатель,
+        и цифры вернутся ровно те же.
+      </div>
+      <div className="card" style={{ marginBottom: 32, overflowX: 'auto' }}>
+        <ExcludedBlock
+          rows={excluded}
+          busyId={excludedBusy}
+          onToggle={async (r) => {
+            setExcludedBusy(r.id);
+            setError('');
+            try {
+              await api.setAnalyticsExcludedActive(r.id, !r.isActive);
+              const [ex, ov, f, pr] = await Promise.all([
+                api.getAnalyticsExcluded(),
+                api.getAnalyticsOverview({ from, to }),
+                api.getAnalyticsFunnel({ from, to }),
+                api.getAnalyticsProducts({ from, to }),
+              ]);
+              setExcluded(ex);
+              setOverview(ov);
+              setFunnel(f);
+              setProducts(pr);
+            } catch (e) {
+              setError(e.message);
+            } finally {
+              setExcludedBusy(null);
+            }
+          }}
+        />
+      </div>
     </div>
   );
 }
