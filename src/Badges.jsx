@@ -299,10 +299,10 @@ export default function Badges() {
         <table className="product-table">
           <thead>
             <tr>
-              <th style={{ width: 200 }}>Бейдж</th>
+              <th style={{ width: 170 }}>Бейдж</th>
               <th>Цвета</th>
-              <th style={{ width: 90 }}>Порядок</th>
-              <th style={{ width: 150 }}>Показывать</th>
+              <th style={{ width: 70 }}>Порядок</th>
+              <th style={{ width: 110 }}>Показывать</th>
               <th>Используется</th>
               <th></th>
             </tr>
@@ -311,7 +311,7 @@ export default function Badges() {
             {items.map((b) => (
               <tr key={b.id} style={{ opacity: b.isActive ? 1 : 0.55 }}>
                 <td><BadgePreview badge={b} scale={1.6} /></td>
-                <td className="hint" style={{ whiteSpace: 'nowrap' }}>
+                <td className="hint">
                   фон {b.bgColor}<br />текст {b.textColor}
                 </td>
                 <td>{b.sortOrder}</td>
@@ -333,7 +333,7 @@ export default function Badges() {
                   {b.productCount > 0 ? `${b.productCount} товаров` : 'нигде'}
                 </td>
                 <td>
-                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                     <button className="btn-secondary" onClick={() => setEditing({ ...EMPTY_BADGE, ...b, icon: b.icon || '' })}>
                       Изменить
                     </button>
