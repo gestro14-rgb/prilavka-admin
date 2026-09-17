@@ -170,6 +170,10 @@ export default function Reviews() {
       ) : reviews.length === 0 ? (
         <div className="card"><div className="empty-hint">Пока нет отзывов.</div></div>
       ) : (
+        {/* Колонка «Товар» добавила таблице ширины, и на окне уже ~1000px
+            она начинала толкать вбок всю страницу. Прокрутка внутри
+            контейнера — тот же приём, что у таблиц «Аналитики». */}
+        <div style={{ overflowX: 'auto' }}>
         <table className="product-table">
           <thead>
             <tr>
@@ -207,7 +211,7 @@ export default function Reviews() {
                     ни на одной странице товара (публичная выборка требует
                     product_id = id товара). Так создаются отзывы, добавленные
                     руками через форму выше. */}
-                <td style={{ maxWidth: 200 }}>
+                <td style={{ maxWidth: 150 }}>
                   {r.productTitle
                     ? <span
                         title={r.productTitle}
@@ -231,6 +235,7 @@ export default function Reviews() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );
