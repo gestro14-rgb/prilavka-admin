@@ -178,6 +178,7 @@ export default function Reviews() {
               <th>Имя</th>
               <th>Район</th>
               <th>Оценка</th>
+              <th>Товар</th>
               <th>Текст</th>
               <th></th>
             </tr>
@@ -194,6 +195,31 @@ export default function Reviews() {
                 <td><b>{r.name}</b></td>
                 <td>{r.area}</td>
                 <td>{'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}</td>
+                {/* Один отзыв покупателя backend раскладывает на отдельную
+                    строку для каждого товара заказа — с одинаковым текстом,
+                    но своим product_id. Без этой колонки строки выглядели
+                    одинаково, и было не видно, какую из них публикуешь.
+                    Данные приходят из GET /api/admin/reviews как есть,
+                    бэкенд для этого не менялся.
+
+                    «Без привязки» — не то же самое, что «все товары»:
+                    такой отзыв виден на Главной и на экране «Отзывы», но
+                    ни на одной странице товара (публичная выборка требует
+                    product_id = id товара). Так создаются отзывы, добавленные
+                    руками через форму выше. */}
+                <td style={{ maxWidth: 200 }}>
+                  {r.productTitle
+                    ? <span
+                        title={r.productTitle}
+                        style={{
+                          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden', wordBreak: 'break-word',
+                        }}
+                      >
+                        {r.productTitle}
+                      </span>
+                    : <span style={{ color: 'var(--ink-soft)' }}>Без привязки</span>}
+                </td>
                 <td style={{ maxWidth: 280 }}>{r.text}</td>
                 <td style={{ display: 'flex', gap: 6 }}>
                   {r.status === 'pending' && (
