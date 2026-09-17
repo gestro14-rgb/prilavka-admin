@@ -170,11 +170,11 @@ export default function Reviews() {
       ) : reviews.length === 0 ? (
         <div className="card"><div className="empty-hint">Пока нет отзывов.</div></div>
       ) : (
-        {/* Колонка «Товар» добавила таблице ширины, и на окне уже ~1000px
-            она начинала толкать вбок всю страницу. Прокрутка внутри
-            контейнера — тот же приём, что у таблиц «Аналитики». */}
+        /* Колонка «Товар» добавила таблице ширины, и на окне уже ~1000px
+           она начинала толкать вбок всю страницу. Прокрутка внутри
+           контейнера — тот же приём, что у таблиц «Аналитики». */
         <div style={{ overflowX: 'auto' }}>
-        <table className="product-table">
+          <table className="product-table">
           <thead>
             <tr>
               <th>Статус</th>
@@ -234,7 +234,7 @@ export default function Reviews() {
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
         </div>
       )}
     </div>
