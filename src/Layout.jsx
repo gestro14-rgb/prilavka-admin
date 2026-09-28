@@ -48,6 +48,9 @@ export default function Layout() {
           <NavLink to="/promo-codes" className={({ isActive }) => (isActive ? 'active' : '')}>
             🎁 Промокоды
           </NavLink>
+          <NavLink to="/partners" className={({ isActive }) => (isActive ? 'active' : '')}>
+            🤝 Партнёры
+          </NavLink>
           <NavLink to="/users" className={({ isActive }) => (isActive ? 'active' : '')}>
             👥 Пользователи
           </NavLink>

@@ -453,4 +453,28 @@ export const api = {
     request(`/api/admin/rewards/${id}`, {
       method: 'DELETE',
     }),
+
+  // Партнёрская программа (migrations/061). Партнёров не удаляют — их
+  // переводят в inactive, поэтому deletePartner тут нет: на партнёре висят
+  // приведённые клиенты и история начислений.
+  getPartners: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v != null)
+    ).toString();
+    return request(`/api/admin/partners${qs ? '?' + qs : ''}`);
+  },
+  createPartner: (data) =>
+    request('/api/admin/partners', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getPartner: (id) => request(`/api/admin/partners/${id}`),
+  updatePartner: (id, data) =>
+    request(`/api/admin/partners/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  getPartnerReferrals: (id) => request(`/api/admin/partners/${id}/referrals`),
+  getPartnerTransactions: (id) => request(`/api/admin/partners/${id}/transactions`),
+  getPartnerPayouts: (id) => request(`/api/admin/partners/${id}/payouts`),
 };

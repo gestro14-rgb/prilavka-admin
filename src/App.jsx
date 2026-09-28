@@ -10,6 +10,8 @@ import Categories from './Categories';
 import DeliveryZone from './DeliveryZone';
 import Orders from './Orders';
 import PromoCodes from './PromoCodes';
+import Partners from './Partners';
+import PartnerDetail from './PartnerDetail';
 import Users from './Users';
 import Rewards from './Rewards';
 import Reviews from './Reviews';
@@ -61,6 +63,8 @@ export default function App() {
         <Route path="subcategories" element={<Subcategories />} />
         <Route path="delivery-zone" element={<DeliveryZone />} />
         <Route path="promo-codes" element={<PromoCodes />} />
+        <Route path="partners" element={<Partners />} />
+        <Route path="partners/:id" element={<PartnerDetail />} />
         <Route path="users" element={<Users />} />
         <Route path="rewards" element={<Rewards />} />
         <Route path="reviews" element={<Reviews />} />
