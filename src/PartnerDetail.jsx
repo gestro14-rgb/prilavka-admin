@@ -52,6 +52,11 @@ export default function PartnerDetail() {
   // форма заполняется из загруженного партнёра, а не правит его напрямую.
   const [edit, setEdit] = useState(null);
   const [saving, setSaving] = useState(false);
+  // Условия вознаграждения правятся отдельной формой и отдельной кнопкой:
+  // смена имени или slug и включение денег — разные по цене действия, и
+  // сохраняться одним нажатием они не должны.
+  const [rules, setRules] = useState(null);
+  const [savingRules, setSavingRules] = useState(false);
 
   const load = () => {
     api.getPartner(id).then((p) => {
@@ -62,6 +67,13 @@ export default function PartnerDetail() {
         telegramUserId: p.telegramUserId || '',
         referralSlug: p.referralSlug,
         status: p.status,
+      });
+      setRules({
+        firstOrderRewardAmount: p.firstOrderRewardAmount ?? 0,
+        repeatRewardType: p.repeatRewardType || 'percentage',
+        repeatRewardValue: p.repeatRewardValue ?? 0,
+        attributionDurationMonths: p.attributionDurationMonths ?? null,
+        rewardEnabled: Boolean(p.rewardEnabled),
       });
     }).catch((e) => setError(e.message));
     api.getPartnerReferrals(id).then(setReferrals).catch((e) => setError(e.message));
@@ -81,6 +93,26 @@ export default function PartnerDetail() {
       setError(e2.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveRules = async (e) => {
+    e.preventDefault();
+    setError(''); setSuccess(''); setSavingRules(true);
+    try {
+      await api.updatePartner(id, {
+        firstOrderRewardAmount: Number(rules.firstOrderRewardAmount) || 0,
+        repeatRewardType: rules.repeatRewardType,
+        repeatRewardValue: Number(rules.repeatRewardValue) || 0,
+        attributionDurationMonths: rules.attributionDurationMonths,
+        rewardEnabled: rules.rewardEnabled,
+      });
+      setSuccess('Условия сохранены');
+      load();
+    } catch (e2) {
+      setError(e2.message);
+    } finally {
+      setSavingRules(false);
     }
   };
 
@@ -178,6 +210,83 @@ export default function PartnerDetail() {
             </div>
             <button className="btn-primary" type="submit" disabled={saving}>
               {saving ? 'Сохранение…' : 'Сохранить'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {tab === 'overview' && rules && (
+        <div className="card" style={{ padding: 20, marginTop: 12 }}>
+          <h2 style={{ marginTop: 0, fontSize: 17 }}>Условия партнёрской программы</h2>
+
+          <form onSubmit={handleSaveRules}>
+            <div className="field">
+              <label htmlFor="rFirst">Вознаграждение за первый заказ, ₽</label>
+              <input id="rFirst" type="number" min="0" step="1" value={rules.firstOrderRewardAmount}
+                     onChange={(e) => setRules({ ...rules, firstOrderRewardAmount: e.target.value })} />
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>
+                Партнёр получает эту сумму за первый завершённый заказ приведённого клиента.
+              </div>
+            </div>
+
+            <div className="field">
+              <label htmlFor="rType">Повторные заказы</label>
+              <select id="rType" value={rules.repeatRewardType}
+                      onChange={(e) => setRules({ ...rules, repeatRewardType: e.target.value })}>
+                <option value="percentage">% от суммы заказа</option>
+                <option value="fixed">Фиксированная сумма</option>
+              </select>
+            </div>
+
+            <div className="field">
+              <label htmlFor="rValue">
+                {rules.repeatRewardType === 'percentage' ? 'Процент, %' : 'Сумма, ₽'}
+              </label>
+              <input id="rValue" type="number" min="0"
+                     max={rules.repeatRewardType === 'percentage' ? 100 : undefined}
+                     step={rules.repeatRewardType === 'percentage' ? '0.1' : '1'}
+                     value={rules.repeatRewardValue}
+                     onChange={(e) => setRules({ ...rules, repeatRewardValue: e.target.value })} />
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>
+                Начисляется за каждый следующий завершённый заказ в течение срока привязки.
+                {rules.repeatRewardType === 'percentage'
+                  ? ' Процент считается от суммы заказа после скидок.'
+                  : ''}
+              </div>
+            </div>
+
+            <div className="field">
+              <label htmlFor="rMonths">Срок действия привязки</label>
+              <select id="rMonths" value={rules.attributionDurationMonths ?? ''}
+                      onChange={(e) => setRules({
+                        ...rules,
+                        attributionDurationMonths: e.target.value === '' ? null : Number(e.target.value),
+                      })}>
+                <option value="">Без ограничения</option>
+                {[1, 3, 6, 12, 24].map((m) => (
+                  <option key={m} value={m}>{m} {m === 1 ? 'месяц' : m < 5 ? 'месяца' : 'месяцев'}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>
+                После окончания срока новые заказы клиента больше не приносят партнёру вознаграждение.
+                Сам клиент остаётся закреплённым за партнёром и к другому не переходит.
+              </div>
+            </div>
+
+            <div className="field">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={rules.rewardEnabled}
+                       onChange={(e) => setRules({ ...rules, rewardEnabled: e.target.checked })} />
+                Включить начисления
+              </label>
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>
+                Пока выключено, начисления не создаются вовсе. Уже созданные не пересчитываются
+                при изменении условий — новые правила действуют только на будущие заказы.
+              </div>
+            </div>
+
+            <button className="btn-primary" type="submit" disabled={savingRules}>
+              {savingRules ? 'Сохранение…' : 'Сохранить условия'}
             </button>
           </form>
         </div>
