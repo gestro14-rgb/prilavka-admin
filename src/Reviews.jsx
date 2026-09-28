@@ -11,61 +11,6 @@ function plural(n, one, few, many) {
   return many;
 }
 
-/**
- * Склейка строк одного отзыва в одну группу — только на экране.
- *
- * Зачем. Отзыв покупателя backend раскладывает на отдельную строку reviews
- * для каждого товара заказа: одинаковые имя, район, текст, фото и emoji, но
- * свой product_id и свой статус. В плоском списке заказ из семи позиций
- * выглядел как семь разных отзывов.
- *
- * По чему группируем: telegram_user_id + order_id. Оба поля приходят из
- * GET /api/admin/reviews как есть. Раньше order_id админский API не отдавал,
- * и склейка шла по совпадению имени, района, текста, emoji и фото — этого
- * достаточно, чтобы собрать заказ, но недостаточно, чтобы отличить два
- * РАЗНЫХ заказа одного человека с дословно одинаковым текстом. order_id
- * такую двусмысленность снимает полностью, поэтому сравнение по тексту
- * больше не используется.
- *
- * Нет order_id — не группируем: у отзыва, добавленного в админке руками,
- * заказа за спиной нет, и склеивать его не с чем и незачем. Каждый такой
- * отзыв остаётся отдельной карточкой, даже если рядом лежит похожий.
- *
- * Чего НЕ делаем. Не трогаем БД, не объединяем записи, не меняем id и
- * статусы: каждая строка остаётся собой, у неё своя кнопка и свой PATCH.
- *
- * Порядок. Группа встаёт на место первой своей строки, а список приходит
- * от свежих к старым — значит группа занимает позицию своего самого свежего
- * отзыва, и общий порядок сохраняется.
- */
-function groupReviews(rows) {
-  const groups = [];
-  const byKey = new Map();
-  for (const r of rows) {
-    // orderId == null покрывает и null, и undefined — на случай, если
-    // админка окажется новее бэкенда и поля в ответе ещё не будет.
-    const key = r.orderId == null ? null : (r.telegramUserId ?? 'нет') + '|' + r.orderId;
-    let g = key === null ? null : byKey.get(key);
-    if (!g) {
-      g = {
-        key: 'g' + r.id,
-        name: r.name,
-        area: r.area,
-        text: r.text,
-        emoji: r.emoji,
-        imageUrl: r.imageUrl,
-        orderId: r.orderId ?? null,
-        items: [],
-      };
-      groups.push(g);
-      if (key !== null) byKey.set(key, g);
-    }
-    g.items.push(r);
-  }
-  for (const g of groups) g.sameStars = g.items.every((r) => r.stars === g.items[0].stars);
-  return groups;
-}
-
 export default function Reviews() {
   const [reviews, setReviews] = useState(null);
   const [error, setError] = useState('');
@@ -234,103 +179,81 @@ export default function Reviews() {
         <div className="card"><div className="empty-hint">Пока нет отзывов.</div></div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
-          {groupReviews(reviews).map((g) => (
-            <div className="card" key={g.key} style={{ padding: 0, minWidth: 0, overflow: 'hidden' }}>
-              {/* Шапка группы: автор, район, текст — то общее, что у всех
-                  строк одинаково. Показываем один раз, а не семь. */}
-              <div style={{ padding: '12px 14px 10px', borderBottom: '1px solid var(--line)', minWidth: 0 }}>
+          {reviews.map((r) => (
+            <div className="card" key={r.id} style={{ padding: 0, minWidth: 0, overflow: 'hidden' }}>
+              {/* Один отзыв — одна карточка и одна кнопка. Товары приезжают
+                  массивом из review_products (migrations/060); склеивать
+                  строки на экране, как раньше, больше не нужно — их нет. */}
+              <div style={{ padding: '12px 14px 10px', borderBottom: r.products.length ? '1px solid var(--line)' : 'none', minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
-                  <span style={{ fontSize: 20, lineHeight: 1 }}>{g.emoji}</span>
-                  <b style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.name}</b>
-                  <span style={{ color: 'var(--ink-soft)', fontSize: 13 }}>{g.area}</span>
-                  {/* Номер заказа — там же, где счётчик товаров: это одна
-                      мысль «откуда отзыв и на сколько позиций». У ручного
-                      отзыва админа заказа нет, и плашки тоже нет: строка
-                      товара у него и так говорит «Без привязки». */}
-                  {(g.orderId != null || g.items.length > 1) && (
+                  <span style={{ fontSize: 20, lineHeight: 1 }}>{r.emoji}</span>
+                  <b style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</b>
+                  <span style={{ color: 'var(--ink-soft)', fontSize: 13 }}>{r.area}</span>
+                  {(r.orderId != null || r.products.length > 0) && (
                     <span style={{ fontSize: 12, color: 'var(--ink-soft)', background: 'var(--surface)', borderRadius: 6, padding: '2px 8px' }}>
                       {[
-                        g.orderId != null ? 'Заказ №' + g.orderId : null,
-                        g.items.length + ' ' + plural(g.items.length, 'товар', 'товара', 'товаров'),
+                        r.orderId != null ? 'Заказ №' + r.orderId : null,
+                        r.products.length > 0
+                          ? r.products.length + ' ' + plural(r.products.length, 'товар', 'товара', 'товаров')
+                          : null,
                       ].filter(Boolean).join(' · ')}
                     </span>
                   )}
+
+                  <span style={{ marginLeft: 'auto', flexShrink: 0 }}>
+                    {r.status === 'pending'
+                      ? <span style={{ fontSize: 12, background: '#FFF3CD', color: '#856404', borderRadius: 6, padding: '2px 8px', fontWeight: 600 }}>Ожидает</span>
+                      : <span style={{ fontSize: 12, background: '#D4EDDA', color: '#155724', borderRadius: 6, padding: '2px 8px', fontWeight: 600 }}>Опубликован</span>}
+                  </span>
                 </div>
 
-                {/* Оценка. У одного отзыва она может быть разной по товарам —
-                    на экране отзыва есть блок «Оцените каждый товар». Если
-                    оценки разошлись, не усредняем и не прячем: пишем об этом
-                    прямо, а сами звёзды уходят в строку каждого товара. */}
-                <div style={{ marginTop: 6, fontSize: 14 }}>
-                  {g.sameStars
-                    ? <span title={g.items[0].stars + ' из 5'}>{'★'.repeat(g.items[0].stars)}{'☆'.repeat(5 - g.items[0].stars)}</span>
-                    : <span style={{ fontSize: 12, color: '#856404', background: '#FFF3CD', borderRadius: 6, padding: '2px 8px', fontWeight: 600 }}>
-                        Оценки по товарам различаются — смотрите строки ниже
-                      </span>}
+                {/* Общая оценка отзыва. Оценки отдельных товаров стоят в
+                    строках ниже — там, где они что-то значат. */}
+                <div style={{ marginTop: 6, fontSize: 14 }} title={r.stars + ' из 5'}>
+                  {'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}
                 </div>
 
-                {g.text && (
+                {r.text && (
                   <div style={{ marginTop: 6, fontSize: 13, color: 'var(--ink)', wordBreak: 'break-word', minWidth: 0 }}>
-                    {g.text}
+                    {r.text}
                   </div>
                 )}
-                {g.imageUrl && (
-                  <a href={g.imageUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 6, fontSize: 12 }}>
+                {r.imageUrl && (
+                  <a href={r.imageUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 6, fontSize: 12 }}>
                     фото клиента
                   </a>
                 )}
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  {r.status === 'pending' && (
+                    <button className="btn-primary" style={{ fontSize: 13, padding: '5px 12px' }} onClick={() => handlePublish(r.id)}>
+                      Опубликовать отзыв
+                    </button>
+                  )}
+                  <button className="btn-danger" style={{ fontSize: 13, padding: '5px 12px' }} onClick={() => handleDelete(r.id)}>
+                    Удалить
+                  </button>
+                </div>
               </div>
 
-              {/* Товары. Каждая строка — своя запись reviews со своим id и
-                  своим статусом: «Опубликовать» здесь публикует ровно её,
-                  тем же PATCH, что и раньше. */}
-              <div>
-                {g.items.map((r, i) => (
-                  <div
-                    key={r.id}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10, minHeight: 40,
-                      padding: '4px 14px', minWidth: 0,
-                      borderTop: i === 0 ? 'none' : '1px solid var(--line)',
-                      opacity: r.status === 'pending' ? 0.85 : 1,
-                    }}
-                  >
-                    <span
-                      title={r.productTitle || 'Отзыв не привязан к товару'}
-                      style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                    >
-                      {/* «Без привязки» — не то же самое, что «все товары»:
-                          такой отзыв виден на Главной и на экране «Отзывы»,
-                          но ни на одной странице товара (публичная выборка
-                          требует product_id = id товара). */}
-                      {r.productTitle || <span style={{ color: 'var(--ink-soft)' }}>Без привязки</span>}
-                    </span>
-
-                    {!g.sameStars && (
-                      <span style={{ flexShrink: 0, fontSize: 12, color: 'var(--ink-soft)' }} title={r.stars + ' из 5'}>
-                        {'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}
+              {/* Товары отзыва — справочно: одна публикация накрывает их все,
+                  отдельной кнопки у товара больше нет. Оценка рядом с
+                  названием: именно она идёт в рейтинг этой карточки. */}
+              {r.products.length > 0 && (
+                <div style={{ padding: '6px 14px 10px' }}>
+                  <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 4 }}>Товары:</div>
+                  {r.products.map((p) => (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, padding: '2px 0' }}>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.title}
                       </span>
-                    )}
-
-                    <span style={{ flexShrink: 0 }}>
-                      {r.status === 'pending'
-                        ? <span style={{ fontSize: 12, background: '#FFF3CD', color: '#856404', borderRadius: 6, padding: '2px 8px', fontWeight: 600 }}>Ожидает</span>
-                        : <span style={{ fontSize: 12, background: '#D4EDDA', color: '#155724', borderRadius: 6, padding: '2px 8px', fontWeight: 600 }}>Опубликован</span>}
-                    </span>
-
-                    <span style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                      {r.status === 'pending' && (
-                        <button className="btn-primary" style={{ fontSize: 13, padding: '4px 10px' }} onClick={() => handlePublish(r.id)}>
-                          Опубликовать
-                        </button>
-                      )}
-                      <button className="btn-danger" style={{ fontSize: 13, padding: '4px 10px' }} onClick={() => handleDelete(r.id)}>
-                        Удалить
-                      </button>
-                    </span>
-                  </div>
-                ))}
-              </div>
+                      <span style={{ flexShrink: 0, fontSize: 12, color: 'var(--ink-soft)' }} title={p.stars + ' из 5'}>
+                        {'★'.repeat(p.stars)}{'☆'.repeat(5 - p.stars)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
