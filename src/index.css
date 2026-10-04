@@ -494,6 +494,15 @@ a {
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
+
+.broadcast-users { max-height: 360px; overflow: auto; margin-top: 12px; border: 1px solid #e5e1d8; border-radius: 8px; }
+.broadcast-user { display: flex; gap: 10px; align-items: center; padding: 9px 12px; border-bottom: 1px solid #eeeae2; cursor: pointer; }
+.broadcast-user:last-child { border-bottom: 0; }
+.broadcast-user small { display: block; color: #8b8c85; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(20,25,23,.35); display: grid; place-items: center; z-index: 20; }
+.modal { width: min(480px, calc(100vw - 32px)); background: #fff; border-radius: 14px; padding: 22px; box-shadow: 0 18px 60px rgba(0,0,0,.2); }
+.broadcast-preview { white-space: pre-wrap; background: #f6f3ec; border-radius: 8px; padding: 12px; margin: 14px 0; }
+.success { margin-top: 16px; padding: 12px; color: #24613d; background: #e6f4e9; border-radius: 8px; }
 .switch .switch-knob {
   width: 20px;
   height: 20px;
@@ -512,3 +521,4 @@ a {
 .switch.is-on .switch-knob { border-color: transparent; }
 .switch .switch-text { flex: 1; text-align: center; }
 .switch:disabled { opacity: 0.5; cursor: not-allowed; }
+.broadcast-selection-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0}.broadcast-selection-actions button{padding:6px 10px;border:1px solid #ddd;border-radius:7px;background:#fff;cursor:pointer}.broadcast-selection-actions strong{font-size:12px;color:#5b6259}

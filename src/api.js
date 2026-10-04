@@ -247,6 +247,10 @@ export const api = {
     }),
 
   getUsers: () => request('/api/admin/users'),
+  sendBroadcast: (data) => request('/api/admin/broadcast', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
   adjustUserPoints: (telegramId, delta) =>
     request(`/api/admin/users/${telegramId}/points`, {
       method: 'PATCH',

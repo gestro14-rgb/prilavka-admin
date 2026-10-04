@@ -54,6 +54,9 @@ export default function Layout() {
           <NavLink to="/users" className={({ isActive }) => (isActive ? 'active' : '')}>
             👥 Пользователи
           </NavLink>
+          <NavLink to="/broadcasts" className={({ isActive }) => (isActive ? 'active' : '')}>
+            📣 Рассылки
+          </NavLink>
           <NavLink to="/rewards" className={({ isActive }) => (isActive ? 'active' : '')}>
             🏆 Награды
           </NavLink>

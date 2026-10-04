@@ -13,6 +13,7 @@ import PromoCodes from './PromoCodes';
 import Partners from './Partners';
 import PartnerDetail from './PartnerDetail';
 import Users from './Users';
+import Broadcasts from './Broadcasts';
 import Rewards from './Rewards';
 import Reviews from './Reviews';
 import Districts from './Districts';
@@ -65,7 +66,8 @@ export default function App() {
         <Route path="promo-codes" element={<PromoCodes />} />
         <Route path="partners" element={<Partners />} />
         <Route path="partners/:id" element={<PartnerDetail />} />
-        <Route path="users" element={<Users />} />
+      <Route path="users" element={<Users />} />
+      <Route path="broadcasts" element={<Broadcasts />} />
         <Route path="rewards" element={<Rewards />} />
         <Route path="reviews" element={<Reviews />} />
         <Route path="districts" element={<Districts />} />
